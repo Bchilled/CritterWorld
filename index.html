@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CritterWorld</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 220px;
+      overflow: hidden;
+      background: transparent;
+      user-select: none;
+      font-family: monospace;
+    }
+    #world-canvas {
+      display: block;
+      cursor: default;
+    }
+    #ui-overlay {
+      position: fixed;
+      top: 4px; right: 8px;
+      display: flex; gap: 6px;
+      z-index: 100;
+    }
+    .ui-btn {
+      background: rgba(0,0,0,0.6);
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 2px 6px;
+      font-size: 10px;
+      cursor: pointer;
+      font-family: monospace;
+    }
+    .ui-btn:hover { background: rgba(0,180,0,0.3); }
+    #item-menu {
+      position: fixed;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      background: rgba(0,0,0,0.85);
+      border: 1px solid #0f0;
+      padding: 6px;
+      gap: 6px;
+      flex-direction: row;
+      z-index: 200;
+    }
+    #item-menu.open { display: flex; }
+    .item-slot {
+      width: 36px; height: 36px;
+      background: rgba(0,60,0,0.5);
+      border: 1px solid #0f0;
+      cursor: grab;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; color: #0f0; text-align: center;
+    }
+    .item-slot:hover { background: rgba(0,120,0,0.5); }
+    #drag-item {
+      position: fixed;
+      pointer-events: none;
+      z-index: 999;
+      display: none;
+    }
+    #tooltip {
+      position: fixed;
+      background: rgba(0,0,0,0.8);
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 2px 5px;
+      font-size: 9px;
+      pointer-events: none;
+      display: none;
+      z-index: 300;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="world-canvas"></canvas>
+
+<div id="ui-overlay">
+  <button class="ui-btn" id="btn-zoom-in">+</button>
+  <button class="ui-btn" id="btn-zoom-out">-</button>
+  <button class="ui-btn" id="btn-speed">1x</button>
+  <button class="ui-btn" id="btn-pause">||</button>
+</div>
+
+<div id="item-menu">
+  <div class="item-slot" draggable="true" data-item="cookie" title="Cookie">
+    <canvas width="24" height="24" id="item-cookie"></canvas>
+    <span>cookie</span>
+  </div>
+  <div class="item-slot" draggable="true" data-item="axe" title="Axe">
+    <canvas width="24" height="24" id="item-axe"></canvas>
+    <span>axe</span>
+  </div>
+  <div class="item-slot" draggable="true" data-item="spear" title="Spear">
+    <canvas width="24" height="24" id="item-spear"></canvas>
+    <span>spear</span>
+  </div>
+  <div class="item-slot" draggable="true" data-item="rod" title="Rod">
+    <canvas width="24" height="24" id="item-rod"></canvas>
+    <span>rod</span>
+  </div>
+  <div class="item-slot" draggable="true" data-item="seed" title="Seed">
+    <canvas width="24" height="24" id="item-seed"></canvas>
+    <span>seed</span>
+  </div>
+  <div class="item-slot" draggable="true" data-item="egg" title="Egg">
+    <canvas width="24" height="24" id="item-egg"></canvas>
+    <span>egg</span>
+  </div>
+</div>
+
+<canvas id="drag-item" width="32" height="32"></canvas>
+<div id="tooltip"></div>
+
+<script src="world.js"></script>
+</body>
+</html>

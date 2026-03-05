@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DISHBORN — Species Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06060f;
+    --surface: #0a0a18;
+    --border: #16162a;
+    --neon: #39ff14;
+    --cyan: #00f5ff;
+    --amber: #ffb700;
+    --red: #ff3355;
+    --purple: #b44dff;
+    --text: #c0c0d8;
+    --dim: #44445a;
+    --white: #eeeeff;
+    --locked: #1a1a2a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px; overflow: hidden; }
+
+  /* JOURNAL LAYOUT */
+  .journal-wrap { display: grid; grid-template-columns: 260px 1fr; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: #050510;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .journal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px; font-weight: 800;
+    color: var(--neon);
+    letter-spacing: -0.5px;
+    text-shadow: 0 0 12px rgba(57,255,20,0.3);
+  }
+  .journal-subtitle {
+    color: var(--dim); font-size: 10px; letter-spacing: 2px;
+    margin-top: 3px; text-transform: uppercase;
+  }
+  .journal-stats {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 16px;
+  }
+  .jstat { text-align: center; }
+  .jstat-num { color: var(--neon); font-size: 16px; font-weight: 700; }
+  .jstat-label { color: var(--dim); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; }
+
+  .sidebar-section-label {
+    padding: 10px 18px 6px;
+    color: var(--dim); font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .entry-list { overflow-y: auto; flex: 1; }
+  .entry-item {
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .entry-item:hover { background: rgba(57,255,20,0.04); }
+  .entry-item.active { background: rgba(57,255,20,0.07); border-left: 2px solid var(--neon); }
+  .entry-item.locked { opacity: 0.4; cursor: default; }
+  .entry-icon { font-size: 16px; min-width: 20px; text-align: center; }
+  .entry-info { flex: 1; min-width: 0; }
+  .entry-name { color: var(--white); font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-item.locked .entry-name { color: var(--dim); }
+  .entry-meta { color: var(--dim); font-size: 9px; margin-top: 2px; }
+  .entry-lock { color: var(--dim); font-size: 10px; }
+  .new-badge {
+    background: var(--neon); color: #000;
+    font-size: 8px; font-weight: 700;
+    padding: 1px 4px; border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* MAIN PANEL */
+  .main-panel {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 20px 28px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .panel-icon { font-size: 28px; }
+  .panel-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--white); }
+  .panel-day { color: var(--dim); font-size: 10px; letter-spacing: 2px; margin-top: 2px; text-transform: uppercase; }
+  .panel-category {
+    margin-left: auto;
+    background: rgba(57,255,20,0.1);
+    border: 1px solid rgba(57,255,20,0.2);
+    color: var(--neon); font-size: 9px;
+    padding: 3px 10px; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  /* ENTRY CONTENT */
+  .entry-content { max-width: 620px; }
+  .entry-narrative {
+    color: var(--text); font-size: 13px; line-height: 1.8;
+    margin-bottom: 24px;
+    border-left: 2px solid var(--border);
+    padding-left: 16px;
+  }
+  .entry-narrative em { color: var(--amber); font-style: italic; }
+  .entry-narrative strong { color: var(--white); }
+
+  /* VOSS NOTE */
+  .voss-note {
+    background: #08080f;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+  }
+  .voss-label { color: var(--cyan); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .voss-text { color: var(--text); font-size: 12px; font-style: italic; line-height: 1.7; }
+
+  /* OBSERVATION DETAILS */
+  .obs-details {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    margin-bottom: 20px;
+  }
+  .obs-detail {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .od-label { color: var(--dim); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+  .od-value { color: var(--white); font-size: 11px; }
+
+  /* UNLOCK INFO */
+  .unlock-info {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-bottom: 20px;
+  }
+  .unlock-item {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(57,255,20,0.04);
+    border: 1px solid rgba(57,255,20,0.12);
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+  .unlock-icon { font-size: 14px; }
+  .unlock-label { color: var(--text); }
+  .unlock-value { color: var(--neon); font-weight: 700; margin-left: auto; }
+
+  /* LOCKED SCREEN */
+  .locked-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; color: var(--dim); text-align: center; gap: 12px;
+  }
+  .locked-icon { font-size: 48px; opacity: 0.3; }
+  .locked-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--dim); }
+  .locked-hint { font-size: 11px; max-width: 280px; line-height: 1.7; }
+  .locked-progress { margin-top: 8px; }
+  .progress-bar { background: var(--border); height: 3px; width: 200px; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--dim); transition: width .3s; }
+
+  /* WELCOME SCREEN */
+  .welcome-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; text-align: center; gap: 16px; padding: 40px;
+  }
+  .welcome-logo {
+    font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800;
+    color: var(--neon); text-shadow: 0 0 30px rgba(57,255,20,0.4);
+  }
+  .welcome-tagline { color: var(--amber); font-style: italic; font-size: 14px; }
+  .welcome-text { color: var(--dim); font-size: 11px; max-width: 360px; line-height: 1.9; margin-top: 8px; }
+
+  /* VOSS WIKI */
+  .wiki-tier {
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+  }
+  .wiki-tier-header {
+    background: var(--surface); padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+  }
+  .wiki-tier-label { color: var(--cyan); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+  .wiki-tier-status { margin-left: auto; font-size: 10px; }
+  .wiki-tier-body { padding: 14px 16px; font-size: 12px; line-height: 1.8; color: var(--text); }
+  .wiki-tier-body.locked-tier { color: var(--dim); font-family: monospace; letter-spacing: 3px; font-size: 10px; }
+  .redacted { background: var(--dim); color: var(--dim); padding: 0 3px; user-select: none; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .fade-in { animation: fadeIn .2s ease forwards; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulsing { animation: pulse 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="journal-wrap">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="journal-title">DISHBORN</div>
+      <div class="journal-subtitle">Species Journal</div>
+    </div>
+    <div class="journal-stats">
+      <div class="jstat">
+        <div class="jstat-num" id="stat-observed">0</div>
+        <div class="jstat-label">Observed</div>
+      </div>
+      <div class="jstat">
+        <div class="jstat-num" id="stat-unlocked">0</div>
+        <div class="jstat-label">Unlocked</div>
+      </div>
+      <div class="jstat">
+        <div class="jstat-num" id="stat-gen">1</div>
+        <div class="jstat-label">Generation</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Observations</div>
+    <div class="entry-list" id="entry-list"></div>
+  </div>
+
+  <!-- MAIN PANEL -->
+  <div class="main-panel" id="main-panel">
+    <div class="welcome-screen" id="welcome-screen">
+      <div class="welcome-logo">DISHBORN</div>
+      <div class="welcome-tagline">"Life finds a way. Yours just found your desktop."</div>
+      <div class="welcome-text">
+        This journal records what you witness.<br>
+        Nothing is written here until you see it happen.<br><br>
+        Watch them long enough.<br>
+        They'll surprise you.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DEMO DATA (in real game, this comes from world engine) ───────────────────
+const DEMO_OBSERVATIONS = [
+  {
+    key: "first_fire",
+    name: "First Fire",
+    icon: "🔥",
+    category: "Survival",
+    day: 3,
+    generation: 1,
+    isNew: true,
+    locked: false,
+    narrative: `<strong>Gloop</strong> had been trying for hours. You watched it gather dry grass, stack it against a flat stone, and rub two pieces of bark together. Nothing. Then nothing. Then — smoke. A small curl of it. Then light.<br><br>
+    <em>Everything stopped for a moment. The others came. They didn't know what to make of it yet. But they came.</em><br><br>
+    The fire was small. It lasted until morning. They slept around it — not close, not far. Careful.`,
+    vossNote: "They figured it out.",
+    unlocks: [
+      { icon: "⚔️", label: "Item Unlocked", value: "Weapon Choice" },
+      { icon: "📖", label: "Journal Entry", value: "Fire — Day 3" },
+    ],
+    details: [
+      { label: "Witnessed By", value: "Gloop (Adult)" },
+      { label: "World Day", value: "Day 3" },
+      { label: "Population", value: "4 Petricules" },
+      { label: "Biome", value: "Forest" },
+    ]
+  },
+  {
+    key: "first_baby",
+    name: "First Birth",
+    icon: "🥚",
+    category: "Social",
+    day: 7,
+    generation: 1,
+    isNew: true,
+    locked: false,
+    narrative: `<strong>Vreetbit</strong> and <strong>Snaxorp</strong> had been spending time near the water. You'd noticed. Voss had noticed too — though she didn't say much.<br><br>
+    <em>A honey exchange. Then weeks later — an egg.</em><br><br>
+    It hatched on a warm night. The group gathered. No one had told them to. Small and confused, the new one looked at all of them and made a sound that wasn't quite a question.`,
+    vossNote: "New one.",
+    unlocks: [
+      { icon: "⚽", label: "Item Unlocked", value: "Ball" },
+      { icon: "🎉", label: "Hat Unlocked", value: "Party Hat" },
+    ],
+    details: [
+      { label: "Parents", value: "Vreetbit + Snaxorp" },
+      { label: "World Day", value: "Day 7" },
+      { label: "Population", value: "5 Petricules" },
+      { label: "Voice Type", value: "Organic" },
+    ]
+  },
+  {
+    key: "first_murder",
+    name: "First Murder",
+    icon: "💀",
+    category: "Conflict",
+    day: 12,
+    generation: 1,
+    isNew: false,
+    locked: false,
+    narrative: `It was <strong>Fnordkin</strong>. You'd noticed its aggression before — the way it lingered near the honey jar, the way it watched others eat. You thought it would steal something.<br><br>
+    <em>It was deliberate. The others scattered. Fnordkin didn't chase them.</em><br><br>
+    Voss said nothing for a long time. You felt the weight of the choice in front of you — the rod that might redirect it, the bow that might arm it further.`,
+    vossNote: null, // Intentional silence
+    unlocks: [
+      { icon: "🎯", label: "Choice Required", value: "Rod or Bow?" },
+    ],
+    details: [
+      { label: "Perpetrator", value: "Fnordkin (Adult, Evil)" },
+      { label: "World Day", value: "Day 12" },
+      { label: "Archetype", value: "Evil — Empathy 4, Greed 91" },
+      { label: "Consequence", value: "Population: 4 remaining" },
+    ]
+  },
+  {
+    key: "group_chorus",
+    name: "The Chorus",
+    icon: "🎵",
+    category: "Social",
+    day: 18,
+    generation: 1,
+    isNew: false,
+    locked: false,
+    narrative: `It started with <strong>Bluplet</strong> — the one that always seemed to be doing something slightly different from the others. A single tone, late at night, near the dying fire.<br><br>
+    Then <strong>Squibix</strong> joined. Then two more. None of them had done it before. The rhythm wasn't quite in sync but something about it made you stop moving.<br><br>
+    <em>Voss said: "Listen."</em><br><br>
+    You did. It lasted four minutes. Then they all went back to sleep.`,
+    vossNote: "Listen.",
+    unlocks: [],
+    details: [
+      { label: "Time", value: "Night — Day 18" },
+      { label: "Participants", value: "4 Petricules" },
+      { label: "Started By", value: "Bluplet (Genius archetype)" },
+      { label: "Rarity", value: "Rare — easy to miss" },
+    ]
+  },
+  {
+    key: "elder_sacrificed",
+    name: "The Sacrifice",
+    icon: "🩸",
+    category: "Elder",
+    day: 41,
+    generation: 2,
+    isNew: false,
+    locked: false,
+    narrative: `<strong>Globwug</strong> was the oldest in the colony — the one who'd survived two cold seasons, who'd watched children grow to adults, who'd stood at the edge of the world and come back. By generation two the younger ones had stopped listening to it.<br><br>
+    <em>It wasn't quick. You could have intervened. You didn't.</em><br><br>
+    The colony continued. Piety spiked. Something dark formed around the act. Voss didn't say anything for three in-game days.`,
+    vossNote: null, // Silence — most powerful Voss response
+    unlocks: [
+      { icon: "📊", label: "Generation Drift", value: "+Piety +10, −Empathy −10" },
+    ],
+    details: [
+      { label: "Victim", value: "Globwug (Elder, Gen 1 survivor)" },
+      { label: "World Day", value: "Day 41, Gen 2" },
+      { label: "Aftermath", value: "Voss silent for 3 days" },
+      { label: "Drift Effect", value: "Gen 3 more pious, less empathetic" },
+    ]
+  },
+  {
+    key: "holy_egg_spawned",
+    name: "The Holy One",
+    icon: "✨",
+    category: "Spiritual",
+    day: 58,
+    generation: 2,
+    isNew: false,
+    locked: false,
+    narrative: `There was nothing different about the egg. Same size. Same warmth. <strong>Wumpbit</strong> and <strong>Grakle</strong> had bred a hundred times in this colony's history.<br><br>
+    When it hatched — they all stopped. Every petricule in the world stood still for six seconds. Then they moved toward it.<br><br>
+    <em>Voss: "Something different came out of that one."</em><br><br>
+    You have watched 58 days of this world. Nothing has felt like this before. Whatever it is — it will die eventually. What happens then is not written yet.`,
+    vossNote: "Something different came out of that one.",
+    unlocks: [
+      { icon: "📖", label: "Wiki Entry Unlocked", value: "The Holy One" },
+      { icon: "👒", label: "Hat Unlocked", value: "Pope Hat (colony)" },
+    ],
+    details: [
+      { label: "Born To", value: "Wumpbit + Grakle" },
+      { label: "World Day", value: "Day 58, Gen 2" },
+      { label: "Colony Response", value: "All stopped — 6 seconds" },
+      { label: "Pending Path", value: "Heaven or False Prophet" },
+    ]
+  },
+
+  // LOCKED ENTRIES
+  {
+    key: "end_harmony",
+    name: "Harmony",
+    icon: "🌿",
+    category: "End State",
+    locked: true,
+    lockHint: "Achieve a peaceful civilization across 3+ generations without a warlord or elder exile",
+    lockProgress: 45,
+  },
+  {
+    key: "end_heaven",
+    name: "Heaven",
+    icon: "☁️",
+    category: "End State",
+    locked: true,
+    lockHint: "A Holy One must be born, survive to elder, and die naturally",
+    lockProgress: 60,
+  },
+  {
+    key: "alien_extraction",
+    name: "Extraction",
+    icon: "👽",
+    category: "End State",
+    locked: true,
+    lockHint: "???",
+    lockProgress: 0,
+  },
+  {
+    key: "voss_wiki_tier3",
+    name: "Voss — Full Record",
+    icon: "📋",
+    category: "Voss Wiki",
+    locked: true,
+    lockHint: "Witness all 11 end states across any number of playthroughs",
+    lockProgress: 18,
+  },
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let activeEntry = null;
+let observedCount = DEMO_OBSERVATIONS.filter(o => !o.locked).length;
+let unlockedCount = DEMO_OBSERVATIONS.filter(o => !o.locked).length;
+
+// ─── RENDER SIDEBAR ──────────────────────────────────────────────────────────
+function renderSidebar() {
+  document.getElementById('stat-observed').textContent = observedCount;
+  document.getElementById('stat-unlocked').textContent = unlockedCount;
+
+  const list = document.getElementById('entry-list');
+  list.innerHTML = '';
+
+  // Group by category
+  const cats = {};
+  DEMO_OBSERVATIONS.forEach(obs => {
+    const cat = obs.category || 'Other';
+    if (!cats[cat]) cats[cat] = [];
+    cats[cat].push(obs);
+  });
+
+  for (const [cat, entries] of Object.entries(cats)) {
+    const label = document.createElement('div');
+    label.className = 'sidebar-section-label';
+    label.style.cssText = 'margin-top:8px;';
+    label.textContent = cat;
+    list.appendChild(label);
+
+    entries.forEach(obs => {
+      const item = document.createElement('div');
+      item.className = 'entry-item' + (obs.locked ? ' locked' : '') + (activeEntry?.key === obs.key ? ' active' : '');
+      item.onclick = () => !obs.locked && selectEntry(obs);
+
+      item.innerHTML = `
+        <div class="entry-icon">${obs.locked ? '🔒' : obs.icon}</div>
+        <div class="entry-info">
+          <div class="entry-name">${obs.locked ? '???' : obs.name}</div>
+          <div class="entry-meta">${obs.locked ? 'Locked' : `Day ${obs.day || '?'} · Gen ${obs.generation || '?'}`}</div>
+        </div>
+        ${obs.isNew && !obs.locked ? '<div class="new-badge">NEW</div>' : ''}
+        ${obs.locked ? '<div class="entry-lock">🔒</div>' : ''}
+      `;
+      list.appendChild(item);
+    });
+  }
+}
+
+// ─── RENDER ENTRY ────────────────────────────────────────────────────────────
+function selectEntry(obs) {
+  activeEntry = obs;
+  obs.isNew = false;
+  renderSidebar();
+
+  const panel = document.getElementById('main-panel');
+
+  if (obs.locked) {
+    panel.innerHTML = `
+      <div class="locked-screen fade-in">
+        <div class="locked-icon">${obs.icon}</div>
+        <div class="locked-title">${obs.name}</div>
+        <div class="locked-hint">${obs.lockHint || 'Continue playing to unlock this entry.'}</div>
+        <div class="locked-progress">
+          <div style="color:var(--dim);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Progress</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${obs.lockProgress||0}%"></div></div>
+          <div style="color:var(--dim);font-size:9px;margin-top:4px;text-align:center">${obs.lockProgress||0}%</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let unlocksHTML = '';
+  if (obs.unlocks?.length) {
+    unlocksHTML = `
+      <div style="margin-bottom:8px;color:var(--dim);font-size:9px;letter-spacing:2px;text-transform:uppercase;">Unlocked</div>
+      <div class="unlock-info">
+        ${obs.unlocks.map(u => `
+          <div class="unlock-item">
+            <span class="unlock-icon">${u.icon}</span>
+            <span class="unlock-label">${u.label}</span>
+            <span class="unlock-value">${u.value}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  let detailsHTML = '';
+  if (obs.details?.length) {
+    detailsHTML = `
+      <div class="obs-details">
+        ${obs.details.map(d => `
+          <div class="obs-detail">
+            <div class="od-label">${d.label}</div>
+            <div class="od-value">${d.value}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  const vossHTML = obs.vossNote
+    ? `<div class="voss-note">
+        <div class="voss-label">Voss</div>
+        <div class="voss-text">"${obs.vossNote}"</div>
+       </div>`
+    : obs.vossNote === null
+    ? `<div class="voss-note" style="border-left-color:var(--dim)">
+        <div class="voss-label" style="color:var(--dim)">Voss</div>
+        <div class="voss-text" style="color:var(--dim);font-style:normal;font-size:10px;letter-spacing:1px">— silence —</div>
+       </div>`
+    : '';
+
+  panel.innerHTML = `
+    <div class="panel-header">
+      <div class="panel-icon">${obs.icon}</div>
+      <div>
+        <div class="panel-title">${obs.name}</div>
+        <div class="panel-day">Day ${obs.day || '?'} · Generation ${obs.generation || '?'}</div>
+      </div>
+      <div class="panel-category">${obs.category}</div>
+    </div>
+    <div class="panel-body fade-in">
+      <div class="entry-content">
+        <div class="entry-narrative">${obs.narrative || ''}</div>
+        ${vossHTML}
+        ${detailsHTML}
+        ${unlocksHTML}
+      </div>
+    </div>
+  `;
+}
+
+// ─── SIMULATE NEW ENTRY ARRIVING ─────────────────────────────────────────────
+// In real game, world engine pushes entries here
+function simulateNewEntry(obs) {
+  obs.isNew = true;
+  observedCount++;
+  unlockedCount++;
+  renderSidebar();
+
+  // Flash effect
+  const list = document.getElementById('entry-list');
+  list.style.borderLeft = '2px solid var(--neon)';
+  setTimeout(() => list.style.borderLeft = '', 1000);
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderSidebar();
+</script>
+</body>
+</html>

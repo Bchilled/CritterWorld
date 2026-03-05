@@ -1,0 +1,3571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DISHBORN</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── VARIABLES ───────────────────────────────────────── */
+:root {
+  --bg:#06060f; --surface:#09091a; --surface2:#0d0d22;
+  --border:#16162e; --border2:#1e1e3a;
+  --neon:#39ff14; --cyan:#00f5ff; --amber:#ffb700;
+  --red:#ff3355; --purple:#b44dff; --pink:#ff44aa;
+  --text:#b8b8d0; --dim:#3a3a5a; --white:#eeeeff;
+  --voss:#00f5ff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;font-size:12px;overflow:hidden;}
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+#game-root{display:grid;grid-template-rows:40px 1fr 140px;grid-template-columns:220px 1fr 240px;height:100vh;gap:0;}
+#topbar{grid-column:1/4;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:20px;z-index:10;}
+#sidebar-left{background:#050510;border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+#world-canvas-wrap{position:relative;overflow:hidden;background:var(--bg);}
+#sidebar-right{background:#050510;border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+#bottom-bar{grid-column:1/4;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:stretch;padding:0;}
+
+/* ── TOPBAR ──────────────────────────────────────────── */
+.game-logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--neon);letter-spacing:-0.5px;text-shadow:0 0 12px rgba(57,255,20,.35);}
+.topbar-stat{display:flex;flex-direction:column;align-items:center;min-width:48px;}
+.ts-val{color:var(--white);font-size:13px;font-weight:700;}
+.ts-label{color:var(--dim);font-size:8px;letter-spacing:1.5px;text-transform:uppercase;}
+.topbar-divider{width:1px;height:24px;background:var(--border);}
+.topbar-time{color:var(--amber);font-size:11px;margin-left:auto;}
+.speed-btn{background:var(--border);border:none;color:var(--dim);font-family:'Space Mono',monospace;font-size:10px;padding:4px 8px;cursor:pointer;letter-spacing:1px;transition:.1s;}
+.speed-btn.active{background:var(--neon);color:#000;}
+.speed-btn:hover:not(.active){background:var(--border2);color:var(--text);}
+.pause-btn{background:transparent;border:1px solid var(--border2);color:var(--text);font-family:'Space Mono',monospace;font-size:11px;padding:4px 12px;cursor:pointer;letter-spacing:1px;}
+.pause-btn:hover{border-color:var(--neon);color:var(--neon);}
+
+/* ── WORLD ───────────────────────────────────────────── */
+#world-canvas{position:absolute;top:0;left:0;}
+#world-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+
+/* biome gradient backgrounds */
+.biome-forest  { background: radial-gradient(ellipse at 50% 100%, #0a1a08 0%, #030a02 60%, #020508 100%); }
+.biome-tundra  { background: radial-gradient(ellipse at 50% 100%, #0a0f1a 0%, #040810 60%, #020308 100%); }
+.biome-desert  { background: radial-gradient(ellipse at 50% 100%, #1a0e04 0%, #0a0602 60%, #050304 100%); }
+.biome-moon    { background: radial-gradient(ellipse at 50% 80%, #0a0a14 0%, #040408 100%); }
+.biome-wasteland{background: radial-gradient(ellipse at 50% 100%, #0f100a 0%, #060708 100%); }
+.biome-nuclear { background: radial-gradient(ellipse at 50% 100%, #0f1404 0%, #060808 100%); }
+
+/* ground line */
+#ground-line{position:absolute;bottom:60px;left:0;right:0;height:1px;background:var(--border);pointer-events:none;}
+
+/* VOSS DIALOGUE */
+#voss-box{
+  position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.85);border:1px solid var(--cyan);
+  padding:10px 16px;max-width:340px;min-width:200px;
+  opacity:0;transition:opacity .3s;pointer-events:none;
+  backdrop-filter:blur(4px);
+}
+#voss-box.visible{opacity:1;}
+#voss-label{color:var(--cyan);font-size:8px;letter-spacing:2px;margin-bottom:4px;}
+#voss-text{color:var(--white);font-size:12px;font-style:italic;line-height:1.6;}
+
+/* OBSERVATION FLASH */
+#obs-flash{
+  position:absolute;top:16px;right:16px;
+  background:rgba(57,255,20,.08);border:1px solid rgba(57,255,20,.25);
+  padding:8px 14px;opacity:0;transition:opacity .3s;
+  font-size:10px;color:var(--neon);letter-spacing:1px;
+  pointer-events:none;max-width:200px;
+}
+#obs-flash.visible{opacity:1;}
+
+/* PETRICULE LABELS */
+.pet-label{
+  position:absolute;font-size:8px;color:var(--dim);
+  pointer-events:none;white-space:nowrap;
+  transform:translate(-50%,-100%);
+  text-transform:uppercase;letter-spacing:1px;
+}
+.pet-label.holy{color:var(--amber);}
+.pet-label.warlord{color:var(--red);}
+
+/* ── LEFT SIDEBAR ────────────────────────────────────── */
+.side-header{padding:14px 14px 8px;border-bottom:1px solid var(--border);color:var(--dim);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+.pet-list{flex:1;overflow-y:auto;}
+.pet-card{
+  padding:8px 12px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .1s;
+  display:flex;align-items:center;gap:8px;
+}
+.pet-card:hover{background:rgba(255,255,255,.02);}
+.pet-card.selected{background:rgba(57,255,20,.05);border-left:2px solid var(--neon);}
+.pet-mini-canvas{flex-shrink:0;}
+.pet-card-info{flex:1;min-width:0;}
+.pet-card-name{color:var(--white);font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pet-card-meta{color:var(--dim);font-size:8px;margin-top:1px;}
+.pet-card-mood{font-size:12px;}
+.holy-glow{text-shadow:0 0 6px var(--amber);}
+.stage-dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin-right:3px;}
+
+/* ── RIGHT SIDEBAR ───────────────────────────────────── */
+.info-block{padding:12px 14px;border-bottom:1px solid var(--border);}
+.info-title{color:var(--dim);font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.stat-label{color:var(--dim);font-size:9px;}
+.stat-val{color:var(--white);font-size:10px;font-weight:700;}
+.genome-bar{background:var(--border);height:3px;border-radius:2px;overflow:hidden;width:80px;}
+.genome-bar-fill{height:100%;transition:width .3s;}
+.need-bar{background:var(--border);height:4px;border-radius:2px;overflow:hidden;flex:1;margin:0 6px;}
+.need-fill{height:100%;transition:width .2s;}
+.creature-code{background:#04040c;border:1px solid var(--border);padding:6px 8px;font-size:9px;color:var(--neon);letter-spacing:.5px;word-break:break-all;margin-top:6px;font-family:'Space Mono',monospace;}
+
+/* ── BOTTOM BAR (ITEMS) ─────────────────────────────── */
+#item-bar{display:flex;align-items:center;gap:0;padding:0 12px;flex:1;overflow-x:auto;}
+.item-slot{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:72px;min-width:72px;height:100%;padding:6px 4px;
+  border-right:1px solid var(--border);cursor:pointer;
+  transition:background .1s;position:relative;
+  user-select:none;
+}
+.item-slot:hover{background:rgba(255,255,255,.03);}
+.item-slot.locked{opacity:.3;cursor:default;filter:grayscale(1);}
+.item-slot.selected{background:rgba(57,255,20,.07);border-top:2px solid var(--neon);}
+.item-emoji{font-size:22px;margin-bottom:2px;}
+.item-name{color:var(--dim);font-size:8px;letter-spacing:1px;text-transform:uppercase;}
+.item-count{
+  position:absolute;top:4px;right:6px;
+  background:var(--neon);color:#000;
+  font-size:8px;font-weight:700;
+  padding:0 3px;border-radius:2px;min-width:14px;text-align:center;
+}
+.item-count.zero{background:var(--dim);color:var(--bg);}
+#selected-item-info{width:200px;border-left:1px solid var(--border);padding:10px 14px;display:flex;flex-direction:column;justify-content:center;}
+.sel-item-name{color:var(--white);font-size:11px;font-weight:700;margin-bottom:3px;}
+.sel-item-desc{color:var(--dim);font-size:9px;line-height:1.6;}
+.sel-item-hint{color:var(--cyan);font-size:9px;margin-top:4px;}
+
+/* ── EGG HATCH OVERLAY ───────────────────────────────── */
+#hatch-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  z-index:100;gap:16px;
+}
+#hatch-overlay.visible{display:flex;}
+#hatch-egg-canvas{border:1px solid var(--border2);}
+#hatch-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--neon);}
+#hatch-subtitle{color:var(--amber);font-style:italic;font-size:14px;}
+#hatch-name{color:var(--white);font-size:16px;letter-spacing:2px;margin-top:4px;}
+#hatch-code{color:var(--dim);font-size:9px;letter-spacing:1px;margin-top:2px;}
+.hatch-archetypes{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px;}
+.arch-tag{background:rgba(57,255,20,.1);border:1px solid rgba(57,255,20,.2);color:var(--neon);font-size:9px;padding:2px 8px;letter-spacing:1px;}
+.arch-tag.evil{background:rgba(255,51,85,.1);border-color:rgba(255,51,85,.3);color:var(--red);}
+.arch-tag.holy{background:rgba(255,183,0,.1);border-color:rgba(255,183,0,.3);color:var(--amber);}
+#hatch-btn{background:var(--neon);color:#000;border:none;font-family:'Space Mono',monospace;font-size:12px;font-weight:700;padding:10px 32px;cursor:pointer;letter-spacing:2px;margin-top:8px;}
+#hatch-btn:hover{background:#fff;}
+#hatch-voss{color:var(--cyan);font-style:italic;font-size:11px;max-width:320px;text-align:center;}
+
+/* ── SCROLLBARS ──────────────────────────────────────── */
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ── ANIMATIONS ──────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes eggWobble{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes shimmer{0%{box-shadow:0 0 0 var(--amber)}50%{box-shadow:0 0 12px var(--amber)}100%{box-shadow:0 0 0 var(--amber)}}
+.wobbling{animation:eggWobble .4s ease-in-out infinite;}
+.holy-shimmer{animation:shimmer 2s ease-in-out infinite;}
+</style>
+</head>
+<body>
+
+<!-- ── STRUCTURE ──────────────────────────────────────── -->
+<div id="game-root">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <div class="game-logo">DISHBORN</div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-pop">0</span><span class="ts-label">Pop</span></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-eggs">0</span><span class="ts-label">Eggs</span></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-gen">1</span><span class="ts-label">Gen</span></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-morale">—</span><span class="ts-label">Morale</span></div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-food">80</span><span class="ts-label">Food</span></div>
+    <div class="topbar-stat"><span class="ts-val" id="stat-honey">0</span><span class="ts-label">Honey</span></div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-time" id="topbar-time">Day 1 · Spring · Day</div>
+    <div style="margin-left:auto;display:flex;gap:4px;align-items:center;">
+      <button class="speed-btn" onclick="setSpeed(0.5)">½×</button>
+      <button class="speed-btn active" id="spd-1" onclick="setSpeed(1)">1×</button>
+      <button class="speed-btn" onclick="setSpeed(3)">3×</button>
+      <button class="speed-btn" onclick="setSpeed(8)">8×</button>
+      <div style="width:8px;"></div>
+      <button class="pause-btn" id="pause-btn" onclick="togglePause()">⏸ PAUSE</button>
+    </div>
+  </div>
+
+  <!-- LEFT SIDEBAR: Population -->
+  <div id="sidebar-left">
+    <div class="side-header">Population</div>
+    <div class="pet-list" id="pet-list"></div>
+  </div>
+
+  <!-- WORLD -->
+  <div id="world-canvas-wrap" class="biome-forest">
+    <canvas id="world-canvas"></canvas>
+    <div id="ground-line"></div>
+    <div id="world-overlay" id="pet-labels"></div>
+    <div id="voss-box"><div id="voss-label">VOSS</div><div id="voss-text"></div></div>
+    <div id="obs-flash"></div>
+  </div>
+
+  <!-- RIGHT SIDEBAR: Selected creature -->
+  <div id="sidebar-right">
+    <div class="side-header">Selected</div>
+    <div id="selected-panel">
+      <div style="padding:20px 14px;color:var(--dim);font-size:10px;text-align:center;line-height:1.8;">
+        Click a creature<br>to inspect it.
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR: Items -->
+  <div id="bottom-bar">
+    <div id="item-bar"></div>
+    <div id="selected-item-info">
+      <div class="sel-item-name" id="sel-item-name">No item selected</div>
+      <div class="sel-item-desc" id="sel-item-desc">Click an item, then click a creature to use it.</div>
+      <div class="sel-item-hint" id="sel-item-hint"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EGG HATCH OVERLAY -->
+<div id="hatch-overlay">
+  <canvas id="hatch-egg-canvas" width="288" height="288"></canvas>
+  <div id="hatch-title">IT HATCHED</div>
+  <div id="hatch-subtitle">A new petricule enters the world.</div>
+  <div id="hatch-name"></div>
+  <div id="hatch-code"></div>
+  <div class="hatch-archetypes" id="hatch-archetypes"></div>
+  <div id="hatch-voss"></div>
+  <button id="hatch-btn" onclick="closeHatch()">PLACE IN WORLD</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DISHBORN v1 — Full Game Engine
+// ═══════════════════════════════════════════════════════════════════
+
+// ── DNA POOLS ──────────────────────────────────────
+
+// ─── PALETTES ──────────────────────────────────────────────────────────────────
+const PP = [
+  {body:"#4caf50",dark:"#2e7d32",light:"#a5d6a7",eye:"#fff",pupil:"#1a237e",name:"Slime"},
+  {body:"#e53935",dark:"#b71c1c",light:"#ef9a9a",eye:"#fff",pupil:"#000",name:"Lava"},
+  {body:"#7c4dff",dark:"#4527a0",light:"#b39ddb",eye:"#e1f5fe",pupil:"#f00",name:"Void"},
+  {body:"#ffb300",dark:"#e65100",light:"#ffe082",eye:"#fff",pupil:"#3e2723",name:"Sand"},
+  {body:"#29b6f6",dark:"#0277bd",light:"#b3e5fc",eye:"#fff",pupil:"#1a237e",name:"Ice"},
+  {body:"#c6ff00",dark:"#558b2f",light:"#f4ff81",eye:"#212121",pupil:"#f00",name:"Toxic"},
+  {body:"#eeeeee",dark:"#9e9e9e",light:"#fff",eye:"#212121",pupil:"#212121",name:"Ghost"},
+  {body:"#37474f",dark:"#102027",light:"#78909c",eye:"#ffee58",pupil:"#e53935",name:"Shadow"},
+  {body:"#ff7043",dark:"#bf360c",light:"#ffccbc",eye:"#fff",pupil:"#000",name:"Coral"},
+  {body:"#66bb6a",dark:"#33691e",light:"#dcedc8",eye:"#fff200",pupil:"#1b5e20",name:"Mold"},
+  {body:"#f48fb1",dark:"#880e4f",light:"#fce4ec",eye:"#fff",pupil:"#880e4f",name:"Bubblegum"},
+  {body:"#80cbc4",dark:"#00695c",light:"#e0f2f1",eye:"#fff",pupil:"#004d40",name:"Teal"},
+  {body:"#ce93d8",dark:"#6a1b9a",light:"#f3e5f5",eye:"#fff",pupil:"#4a148c",name:"Lavender"},
+  {body:"#a1887f",dark:"#4e342e",light:"#d7ccc8",eye:"#fff",pupil:"#3e2723",name:"Mud"},
+  {body:"#fff176",dark:"#f57f17",light:"#fffde7",eye:"#000",pupil:"#e65100",name:"Yolk"},
+  {body:"#1a237e",dark:"#0d0d3b",light:"#3949ab",eye:"#fff176",pupil:"#e53935",name:"Abyss"},
+  {body:"#ff6f00",dark:"#bf360c",light:"#ffcc80",eye:"#fff",pupil:"#000",name:"Ember"},
+  {body:"#b2dfdb",dark:"#00796b",light:"#e0f7fa",eye:"#212121",pupil:"#004d40",name:"Mint"},
+  {body:"#212121",dark:"#000000",light:"#424242",eye:"#e53935",pupil:"#ffee58",name:"Obsidian"},
+  {body:"#ef9a9a",dark:"#b71c1c",light:"#ffcdd2",eye:"#fff",pupil:"#880e4f",name:"Blush"},
+  {body:"#90a4ae",dark:"#455a64",light:"#cfd8dc",eye:"#ffeb3b",pupil:"#e53935",name:"Steel"},
+  {body:"#bf360c",dark:"#7f0000",light:"#ff8a65",eye:"#fff9c4",pupil:"#212121",name:"Rust"},
+  {body:"#4dd0e1",dark:"#006064",light:"#e0f7fa",eye:"#fff",pupil:"#880e4f",name:"Cyan"},
+  {body:"#d4e157",dark:"#827717",light:"#f9fbe7",eye:"#212121",pupil:"#1a237e",name:"Bile"},
+];
+
+function rndPal() {
+  const base = PP[Math.floor(Math.random()*PP.length)];
+  const r = Math.random();
+  if (r < 0.30) { const a=PP[Math.floor(Math.random()*PP.length)]; return {...base,dark:a.dark,accent:a.body,name:base.name+"/"+a.name}; }
+  if (r < 0.45) { const a=PP[Math.floor(Math.random()*PP.length)]; return {...base,eye:a.body,pupil:a.dark,name:base.name+"!"+a.name}; }
+  if (r < 0.58) { const a=PP[Math.floor(Math.random()*PP.length)]; const b=PP[Math.floor(Math.random()*PP.length)]; return {...base,dark:a.dark,light:b.light,accent:b.body,eye:a.eye,pupil:b.pupil,name:base.name+"×"+a.name}; }
+  return base;
+}
+
+// ─── DNA POOLS ─────────────────────────────────────────────────────────────────
+const BODY_SHAPES = [
+  // Classic
+  "round","round","blob","blob","egg","egg","pear","pear",
+  "wide","tall","sausage","chunky","barrel","diamond","tiny",
+  // Animal silhouettes
+  "bear_body","wolf_body","cat_body","horse_body","frog_body",
+  "bird_body","crab_body","snake_body","gorilla_body","rhino_body",
+  // Liquid / ooze / biological
+  "ooze","ooze","dripping","puddle","bubble","amorphous",
+  "melting","sac","lumpy","crystal_body","void_body",
+];
+
+const HEAD_TYPES = [
+  // Generic
+  "round","round","round","oval","oval","square","elongated",
+  // Dinosaur
+  "trex","trex","raptor","croc","triceratops","ankylosaurus",
+  // Amphibian/reptile
+  "frog","frog","axolotl","snail",
+  // Sea
+  "jellyfish","hammerhead","blobfish",
+  // Weird organic
+  "mushroom","tardigrade","mantis","donut","two_headed","cactus",
+  // Animal snouts/faces
+  "dog","cat","bear","rabbit","horse","pig","bull","wolf",
+  "deer","lion","shark","eagle","owl","parrot","snake","gorilla",
+  "elephant","rhino","hippo","bat","fox","raccoon","panda",
+];
+
+const EYE_STYLES = [
+  "beady","beady","big","big","cyclops","compound","sleepy","angry",
+  "wide","swirl","line","stacked","stalked","three","no_eyes",
+  // Animal eyes
+  "cat_slit","goat_rect","snake_slit","bug_dome","bird_side",
+];
+
+const MOUTH_STYLES = [
+  "smile","frown","fangs","beak","beak_open","none","big","zigzag",
+  "proboscis","lamprey","tusk_grin","sideways",
+  // Animal mouths
+  "horse_lip","dog_pant","duck_bill","elephant_mouth","fish_mouth",
+  "beak_hook","frog_wide","cat_whisker","bear_snout",
+];
+
+// ─── ANIMAL PART GENES ─────────────────────────────────────────────────────────
+// These are separate additive layers — recognizable real animal parts
+// Each is drawn on top of/around the base creature
+
+const EAR_TYPES = [
+  "none","none","none","none",
+  // Mammal
+  "cat_ears","dog_floppy","rabbit_long","bear_round","mouse_round",
+  "horse_upright","cow_side","bat_wing_ear","fox_pointed","pig_floppy",
+  "elephant_flap","deer_side","wolf_pointed","lion_round","fennec_giant",
+  // Weird
+  "fin_ear","horn_ear","leaf_ear","tattered","satellite_dish",
+];
+
+const SNOUT_TYPES = [
+  "none","none","none","none","none",
+  // Recognizable snouts
+  "dog_snout","pig_snout","elephant_trunk","horse_muzzle","bear_snout",
+  "duck_bill","anteater","platypus","tapir","rhino_horn_snout",
+  "cat_flat","rabbit_twitch","frog_wide_mouth","wolf_muzzle",
+  // Weird
+  "tube_snout","crab_mouth","beak_curved","drill_nose",
+];
+
+const FEET_TYPES = [
+  "none","none",
+  // Animal feet
+  "hooves","bird_talons","duck_webbed","cat_paws","bear_paws",
+  "frog_webbed","insect_spike","crab_claw_feet","elephant_pad",
+  "rabbit_big","horse_single","goat_split","raptor_claw",
+  // Weird
+  "suction_cups","root_tangle","wheel_feet","spring_coil","blade_feet",
+];
+
+const PATTERN_TYPES = [
+  "none","none","none",
+  // Animal patterns
+  "tiger_stripes","leopard_spots","zebra_stripes","giraffe_patches",
+  "dalmatian","cow_patches","cheetah_dots","snake_diamond",
+  "fish_scales_pattern","peacock_eye","bee_stripes","ladybug_dots",
+  // Weird
+  "circuit_lines","lava_cracks","star_pattern","eye_pattern","void_spots",
+];
+
+const HORN_TYPES = [
+  "none","none","none","none",
+  // Animal horns/antlers
+  "deer_antler","moose_antler","bull_horns","ram_curl","rhino_horn",
+  "unicorn_spiral","triceratops_three","goat_short","ibex_long",
+  "narwhal_tusk","beetle_horn","stag_beetle",
+  // Weird
+  "lightning_horn","crystal_spike","double_spiral","broken_horn","alien_stalk",
+];
+
+const TAIL_TYPES = [
+  "none","none","none",
+  "scorpion","scorpion","lion","lion","lizard","lizard","lizard",
+  "trex","trex","fish","fish","spike_club","coil","tentacle_tail",
+  "frilled","bone_tail","mechanical","ooze_trail","ghost_wisp",
+  "twin_tails","prehensile","stump","feathered",
+  // New animal tails
+  "horse_tail","fox_bushy","pig_curl","beaver_flat","rattlesnake",
+  "peacock_fan","cat_long","monkey_prehensile","dog_wagging","lobster",
+];
+
+// ─── LIMB CONFIGS ──────────────────────────────────────────────────────────────
+const ARM_TYPES = [
+  "stubby","clawed","tentacle","wing","fin","noodle","crab_claw",
+  "blade","root","mechanical","vestigial","giant","none",
+  // Animal arms
+  "gorilla_knuckle","mantis_blade","bear_arm","t_rex_stubby",
+  "octopus_arm","lobster_pincer","praying_mantis","gorilla_arm",
+];
+
+const LEG_TYPES = [
+  "stubby","clawed","tentacle","spring","root","hover_pad","wheel","peg","none","none",
+  // Animal legs
+  "horse_hoof","bird_talon","frog_jump","kangaroo","elephant_pillar",
+  "spider_joint","crab_walking","raptor_leg",
+];
+
+// ─── EXTRAS ────────────────────────────────────────────────────────────────────
+const EXTRA_TYPES = [
+  "none","none","none","none",
+  "big_horn_L","big_horn_R","center_horn",
+  "giant_ear_L","giant_ear_R",
+  "shoulder_spike_L","shoulder_spike_R",
+  "back_fin","back_sail","back_spines",
+  "antenna_cluster","mono_antenna",
+  "parasite_head","mini_arm_back",
+  "biolume_sac","crystal_growth",
+  "eyestalk_L","eyestalk_R",
+  "big_wing_L","big_wing_R",
+  "tumor_blob","shell_back",
+  "mech_arm_back","exhaust_pipe",
+  "glow_node","jaw_extension",
+  "neck_frill","head_crest",
+  "thorn_row","bubble_cluster",
+  "dangling_eye","face_tentacle",
+  "shoulder_mouth","chest_eye",
+  "vestigial_twin","spine_ridge",
+  "radio_antenna","eye_tower",
+  // Animal body extras
+  "mane","dorsal_fin","turtle_shell","hedgehog_spines","porcupine_quills",
+  "chameleon_crest","peacock_tail_display","skunk_stripe","armadillo_band",
+  "axolotl_gills","fish_dorsal","cobra_hood","frilled_neck","camel_hump",
+];
+
+const FEATURES = ["spots","stripes","spikes","none","none","none","scales","fur_patches","cracks","crystals","veins","mossy","circuit","stitches","barnacles","slime_drip","plates","fur_full"];
+const SKIN_TYPES = ["smooth","bumpy","scaly","fuzzy","shiny","matte","cracked","wet","rusted","chitinous","translucent","patchwork"];
+
+// ─── LIFE STAGES ───────────────────────────────────────────────────────────────
+const STAGES = ["baby","teen","adult","old"];
+const STAGE_ACTIONS = {
+  baby:  ["idle","eat","sleep","dance","pickup","death"],
+  teen:  ["idle","walk","eat","drink","sleep","fish","gather","carry","dance","pickup","death"],
+  adult: ["idle","walk","eat","drink","sleep","poop","fish","gather","carry","dance","pickup","attack","chop","mine","cook","build","smith","pump","hunt","death"],
+  old:   ["idle","walk","eat","drink","sleep","dance","pickup","death"],
+};
+const ALL_ACTIONS = [
+  {id:"idle",   label:"Idle",      emoji:"😴",color:"#546e7a"},
+  {id:"walk",   label:"Walk",      emoji:"🚶",color:"#5c6bc0"},
+  {id:"eat",    label:"Eat",       emoji:"🍖",color:"#ef6c00"},
+  {id:"drink",  label:"Drink",     emoji:"💧",color:"#0288d1"},
+  {id:"sleep",  label:"Sleep",     emoji:"💤",color:"#4a148c"},
+  {id:"poop",   label:"Poop",      emoji:"💩",color:"#795548"},
+  {id:"fish",   label:"Fish",      emoji:"🎣",color:"#26a69a"},
+  {id:"gather", label:"Gather",    emoji:"🌿",color:"#388e3c"},
+  {id:"carry",  label:"Carry",     emoji:"📦",color:"#455a64"},
+  {id:"pickup", label:"Picked Up", emoji:"✋",color:"#8e24aa"},
+  {id:"attack", label:"Attack",    emoji:"⚔️",color:"#c62828"},
+  {id:"chop",   label:"Chop Wood", emoji:"🪓",color:"#5d4037"},
+  {id:"mine",   label:"Mine",      emoji:"⛏️",color:"#78909c"},
+  {id:"cook",   label:"Cook",      emoji:"🍳",color:"#f9a825"},
+  {id:"build",  label:"Build",     emoji:"🔨",color:"#7b1fa2"},
+  {id:"smith",  label:"Blacksmith",emoji:"🔥",color:"#bf360c"},
+  {id:"pump",   label:"Pump Oil",  emoji:"⚙️",color:"#37474f"},
+  {id:"hunt",   label:"Hunt",      emoji:"🏹",color:"#6d4c41"},
+  {id:"dance",  label:"Dance",      emoji:"💃",color:"#e91e63"},
+  {id:"death",  label:"Death",     emoji:"💀",color:"#212121"},
+];
+const MOODS = ["❤️","😠","💤","❓","⭐","💰","😨","🎵","🔥","💩","🤢","😍","😭","🤔","💫","🌀","👁️","💥","🧬","⚡"];
+const STAGE_CLR = {baby:"#f48fb1",teen:"#81d4fa",adult:"#a5d6a7",old:"#bcaaa4"};
+const STAGE_LBL = {baby:"👶 Baby",teen:"🧒 Teen",adult:"💪 Adult",old:"👴 Elder"};
+const STAGE_SC  = {baby:0.42,teen:0.68,adult:1.0,old:0.88};
+
+
+// ─── DISHBORN GENOME — BEHAVIORAL GENES ────────────────────────────────────────
+const VOICE_TYPES = ["organic","robotic","squeaky","deep","animalistic"];
+const VOICE_CODES = {organic:"O",robotic:"R",squeaky:"Q",deep:"D",animalistic:"A"};
+const BIOME_PREFS = ["forest","tundra","desert","wasteland","moon","nuclear"];
+const BIOME_CODES = {forest:"F",tundra:"T",desert:"D",wasteland:"W",moon:"M",nuclear:"N"};
+const GENOME_FACTORS = [
+  {key:"aggression",   label:"AGGR", code:"AG", desc:"Fight tendency, territory, mob behavior"},
+  {key:"intelligence", label:"INTL", code:"IQ", desc:"Problem-solving, building, tool efficiency"},
+  {key:"sociability",  label:"SOCL", code:"SC", desc:"Group formation, trade, cultural events"},
+  {key:"curiosity",    label:"CURI", code:"CU", desc:"Exploration range, resource discovery"},
+  {key:"empathy",      label:"EMPY", code:"EM", desc:"Food sharing, elder care, baby nurturing"},
+  {key:"greed",        label:"GRED", code:"GR", desc:"Hoarding, theft likelihood, oligarch potential"},
+  {key:"fear",         label:"FEAR", code:"FR", desc:"Trauma response, hiding, anxiety"},
+  {key:"creativity",   label:"CRTV", code:"CV", desc:"Building variety, cultural expression"},
+  {key:"piety",        label:"PITY", code:"PY", desc:"Worship behavior, cult formation"},
+  {key:"ambition",     label:"AMBT", code:"AM", desc:"Crown-seeking, political power grabs"},
+  {key:"loyalty",      label:"LOYL", code:"LY", desc:"Tribe allegiance, faction resistance"},
+  {key:"mutation_rate",label:"MUTN", code:"MU", desc:"How far children drift from parents"},
+];
+
+// ─── CREATURE CODE ─────────────────────────────────────────────────────────────
+// Format: [V][B]-[BO][HD][E][M]-[AGIQSCCUEMGRFRCVPYAMLYM]-[PAL]
+// Total combinations: ~2×10^33
+function buildCreatureCode(g) {
+  const tier = v => Math.min(9, Math.floor(v / 10.5));
+  const vc = VOICE_CODES[g.voiceType] || "O";
+  const bc = BIOME_CODES[g.biomePref] || "F";
+  const bodyC = (g.bodyShape||"xx").slice(0,2).toUpperCase().replace(/[^A-Z]/g,"X");
+  const headC = (g.headType||"xx").slice(0,2).toUpperCase().replace(/[^A-Z]/g,"X");
+  const eyeC  = (g.eyeStyle||"x").slice(0,1).toUpperCase();
+  const mthC  = (g.mouthStyle||"x").slice(0,1).toUpperCase();
+  const geneStr = GENOME_FACTORS.map(f => {
+    const v = g[f.key] ?? 0;
+    return tier(f.key === "mutation_rate" ? v * 2 : v);
+  }).join("");
+  const palC = (g.palette?.name||"UNK").replace(/[^A-Za-z]/g,"X").slice(0,3).toUpperCase().padEnd(3,"X");
+  return `${vc}${bc}-${bodyC}${headC}${eyeC}${mthC}-${geneStr}-${palC}`;
+}
+
+function assignVoiceType(bodySizeMod, bodyShape, earType, tailType) {
+  if (Math.random() < 0.20) return VOICE_TYPES[Math.floor(Math.random()*VOICE_TYPES.length)];
+  const sz = bodySizeMod || 1.0;
+  const body = bodyShape || "";
+  const hasAnimalParts = (earType && earType !== "none") || (tailType && tailType !== "none");
+  if (sz >= 1.15) return "deep";
+  if (sz <= 0.80) return "squeaky";
+  if (body.includes("dome") || body.includes("chunky") || body.includes("crystal")) return "robotic";
+  if (hasAnimalParts) return "animalistic";
+  return "organic";
+}
+
+function rnd(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function rndInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+function generateName(){
+  const p=["Glob","Zrix","Mork","Sniv","Brux","Florp","Grub","Snax","Krix","Wump","Blorg","Vreet","Squib","Gloop","Narg","Plonk","Squonk","Dribble","Fweep","Blup","Grak","Fnord","Splug","Bweep","Clonk"];
+  const s=["ulus","ix","nak","orp","zer","blob","kin","ling","gut","snot","wort","mush","drip","gunk","spew","ooze","gob","sludge","flab","zit","arg","urp","elch","orb","itch"];
+  return rnd(p)+rnd(s);
+}
+
+
+// ── GENOME GENERATION ────────────────────────────────
+function generateGenome() {
+  // Limbs — fully independent, asymmetry allowed
+  const armL = rnd(ARM_TYPES);
+  const armR = Math.random() < 0.35 ? rnd(ARM_TYPES) : armL; // 35% chance asymmetric
+  const legL = rnd(LEG_TYPES);
+  const legR = Math.random() < 0.25 ? rnd(LEG_TYPES) : legL;
+  // Extra limbs (0-2 bonus weird ones)
+  const extraLimbCount = Math.random() < 0.3 ? rndInt(1,2) : 0;
+  const extraLimbs = Array.from({length:extraLimbCount}, ()=>rnd(ARM_TYPES));
+
+  // Tail config
+  const tailType = rnd(TAIL_TYPES);
+  const tailSide = rnd(["L","R","R","L","center"]);
+  const tailLen  = rndInt(1,3); // 1=short, 2=med, 3=long
+
+  // Extras (0-3 wild attachments, weighted toward fewer)
+  const numExtras = [0,0,0,1,1,1,1,2,2,3][rndInt(0,9)];
+  const extras = [];
+  for(let i=0;i<numExtras;i++){
+    const e = rnd(EXTRA_TYPES);
+    if(!extras.includes(e)) extras.push(e);
+  }
+
+  // Body and head size modifiers — same shape, different scale
+  const bodySizeMod = [0.75, 0.85, 0.85, 1.0, 1.0, 1.0, 1.1, 1.2][rndInt(0,7)];
+  const headSizeMod = [0.8, 0.9, 1.0, 1.0, 1.1, 1.2, 1.4][rndInt(0,6)];
+  const headPos = rnd(["high","high","normal","normal","low","floating"]);
+
+  return {
+    palette:     rndPal(),
+    bodyShape:   rnd(BODY_SHAPES),
+    bodySizeMod,
+    headSizeMod,
+    headPos,
+    headType:    rnd(HEAD_TYPES),
+    eyeStyle:    rnd(EYE_STYLES),
+    mouthStyle:  rnd(MOUTH_STYLES),
+    // Animal part genes
+    earType:     rnd(EAR_TYPES),
+    snoutType:   rnd(SNOUT_TYPES),
+    feetType:    rnd(FEET_TYPES),
+    patternType: rnd(PATTERN_TYPES),
+    hornType:    rnd(HORN_TYPES),
+    armL, armR, legL, legR, extraLimbs,
+    tailType, tailSide, tailLen,
+    extras,
+    feature:     rnd(FEATURES),
+    skin:        rnd(SKIN_TYPES),
+    name:        generateName(),
+    fitness:     rndInt(1,100),
+    // ── DISHBORN behavioral genome ──
+    aggression:   rndInt(0,100),
+    intelligence: rndInt(0,100),
+    sociability:  rndInt(0,100),
+    curiosity:    rndInt(0,100),
+    empathy:      rndInt(0,100),
+    greed:        rndInt(0,100),
+    fear:         rndInt(20,60),  // starts moderate, event-modified in sim
+    creativity:   rndInt(0,100),
+    piety:        rndInt(0,30),   // starts low, rises from holy events
+    ambition:     rndInt(0,100),
+    loyalty:      rndInt(0,100),
+    mutation_rate: rndInt(0,50),
+    biomePref:    BIOME_PREFS[Math.floor(Math.random()*BIOME_PREFS.length)],
+    // voice assigned after physical traits are set
+    get voiceType() {
+      return assignVoiceType(this.bodySizeMod, this.bodyShape, this.earType, this.tailType);
+    },
+  };
+  // Freeze voiceType so it doesn't recompute
+  g.voiceType = assignVoiceType(g.bodySizeMod, g.bodyShape, g.earType, g.tailType);
+  g.creatureCode = buildCreatureCode(g);
+  return g;
+}
+
+// ─── PIXEL DRAW ────────────────────────────────────────────────────────────────
+const SC=3, W=48, H=48;
+function px(ctx,x,y,c,s=SC){ if(x<0||y<0||x>=W||y>=H)return; ctx.fillStyle=c; ctx.fillRect(Math.round(x)*s,Math.round(y)*s,s,s); }
+function rect(ctx,x,y,w,h,c,s=SC){ for(let j=0;j<h;j++) for(let i=0;i<w;i++) px(ctx,x+i,y+j,c,s); }
+
+// ── DRAWING ENGINE ───────────────────────────────────
+function line(ctx,x1,y1,x2,y2,c,s=SC){
+  const dx=Math.abs(x2-x1), dy=Math.abs(y2-y1);
+  const sx=x1<x2?1:-1, sy=y1<y2?1:-1;
+  let err=dx-dy, cx=x1, cy=y1;
+  while(true){ px(ctx,cx,cy,c,s); if(cx===x2&&cy===y2)break; const e2=2*err; if(e2>-dy){err-=dy;cx+=sx;} if(e2<dx){err+=dx;cy+=sy;} }
+}
+
+function drawTail(ctx, genome, bx, by, bw, bh, sc, frame, action, p) {
+  const {tailType:tt, tailSide:ts, tailLen:tl} = genome;
+  if(tt==="none") return;
+  const t=frame;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const wag = Math.sin(t*0.13)*2;
+  const wag2 = Math.sin(t*0.13+1)*1.5;
+  const len = tl; // 1,2,3
+
+  // Anchor point: left, right, or center-back
+  let ax = ts==="L" ? bx-1 : ts==="R" ? bx+bw : bx+Math.round(bw/2);
+  let ay = by+bh-3;
+  const flip = ts==="L" ? -1 : 1;
+
+  if(tt==="scorpion"){
+    // Segmented upward arc then stinger
+    for(let i=0;i<3+len;i++){
+      px(ctx, ax+flip*i, ay-i+Math.round(wag*0.5), i%2===0?dark:acc);
+    }
+    const tipX = ax+flip*(3+len), tipY = ay-(3+len)+Math.round(wag);
+    rect(ctx, tipX, tipY-2, 2, 2, acc); // stinger
+    px(ctx, tipX+flip, tipY-3, light);
+  } else if(tt==="lion"){
+    // Long drooping then fluffy end
+    for(let i=0;i<2+len;i++) px(ctx, ax+flip*Math.round(Math.sin(i*0.8)*1), ay+i+Math.round(wag*0.3), col);
+    const ex=ax+flip*Math.round(Math.sin((2+len)*0.8)), ey=ay+2+len;
+    rect(ctx, ex-1+flip, ey, 3, 3, light); // mane tuft
+    px(ctx, ex+flip, ey-1, light);
+  } else if(tt==="lizard"){
+    // Tapered long tail, wagging
+    const steps = 4+len*2;
+    for(let i=0;i<steps;i++){
+      const sz = Math.max(1, 2-Math.floor(i/3));
+      const wx = Math.round(Math.sin(t*0.13+i*0.5)*1.5*flip);
+      rect(ctx, ax+flip*(i)+wx, ay+Math.round(i*0.3), sz, sz, i%3===0?dark:col);
+    }
+  } else if(tt==="trex"){
+    // Short thick drooping tail
+    rect(ctx, ax+flip*1, ay, 2+len, 2, dark);
+    rect(ctx, ax+flip*(2+len), ay+1, 2, 3, dark);
+    px(ctx, ax+flip*(3+len), ay+2, col);
+  } else if(tt==="fish"){
+    // Horizontal fan tail
+    for(let i=0;i<2+len;i++) px(ctx, ax+flip*i, ay+Math.round(wag*0.4), col);
+    const fx=ax+flip*(2+len), fy=ay+Math.round(wag*0.4);
+    for(let i=-2;i<=2;i++) px(ctx,fx,fy+i,i===0?light:dark);
+  } else if(tt==="spike_club"){
+    for(let i=0;i<2+len;i++) px(ctx,ax+flip*i,ay+Math.round(wag*0.3),col);
+    const cx2=ax+flip*(2+len), cy2=ay+Math.round(wag*0.3);
+    rect(ctx,cx2,cy2-1,3,3,dark);
+    px(ctx,cx2+1,cy2-2,acc); px(ctx,cx2+flip*2,cy2,acc); px(ctx,cx2+1,cy2+2,acc);
+  } else if(tt==="coil"){
+    for(let i=0;i<5+len*2;i++){
+      const angle=(i/(5+len*2))*Math.PI*2+t*3.0;
+      const rx=Math.round(Math.cos(angle)*(1+len));
+      const ry=Math.round(Math.sin(angle)*1);
+      px(ctx,ax+flip*2+rx,ay+1+ry,i%2===0?col:dark);
+    }
+  } else if(tt==="tentacle_tail"){
+    for(let i=0;i<4+len*2;i++){
+      const wx2=Math.round(Math.sin(t*0.1+i*0.7)*2*flip);
+      px(ctx,ax+flip*i*0.5+wx2,ay+i,i%2===0?acc:col);
+    }
+  } else if(tt==="frilled"){
+    rect(ctx,ax+flip,ay,2+len,3,col);
+    for(let i=0;i<2+len;i++) px(ctx,ax+flip*(i+1),ay-1+Math.round(Math.sin(t*0.1+i)*1),acc);
+  } else if(tt==="bone_tail"){
+    for(let i=0;i<3+len;i++) px(ctx,ax+flip*i,ay+Math.round(wag*0.2),i%2===0?"#eeeeee":dark);
+    px(ctx,ax+flip*(3+len),ay+Math.round(wag*0.2),"#fff");
+  } else if(tt==="mechanical"){
+    for(let i=0;i<2+len;i++) rect(ctx,ax+flip*i,ay,1,2,i%2===0?"#90a4ae":"#546e7a");
+    rect(ctx,ax+flip*(2+len),ay-1,3,3,"#78909c");
+    px(ctx,ax+flip*(3+len),ay,"#ffeb3b");
+  } else if(tt==="ooze_trail"){
+    for(let i=0;i<3+len;i++){
+      const w=Math.max(1,2-Math.floor(i/2));
+      rect(ctx,ax+flip*i-Math.round(w/2),ay+1+i,w,1,i%2===0?acc:col);
+    }
+    // drip puddle
+    rect(ctx,ax+flip*(2+len)-1,ay+3+len,3,1,acc);
+  } else if(tt==="ghost_wisp"){
+    for(let i=0;i<3+len;i++){
+      const wx3=Math.round(Math.sin(t*4.8+i)*2*flip);
+      px(ctx,ax+flip*i*0.4+wx3,ay+i,`rgba(${parseInt(p.light.slice(1,3),16)},${parseInt(p.light.slice(3,5),16)},${parseInt(p.light.slice(5,7),16)},${0.8-i*0.15})`);
+    }
+  } else if(tt==="twin_tails"){
+    // Two tails from same anchor
+    for(let i=0;i<2+len;i++){
+      px(ctx,ax+flip*i,ay-i+Math.round(wag),col);
+      px(ctx,ax+flip*i,ay+i+Math.round(wag2),dark);
+    }
+  } else if(tt==="prehensile"){
+    // Curling tail
+    for(let i=0;i<4+len;i++){
+      const angle=i*0.4+t*3.0;
+      px(ctx,ax+flip*Math.round(Math.cos(angle)*i*0.4),ay+Math.round(Math.sin(angle)*i*0.4),i%2===0?col:dark);
+    }
+  } else if(tt==="stump"){
+    rect(ctx,ax+flip,ay,2,2,dark);
+  } else if(tt==="feathered"){
+    for(let i=0;i<2+len;i++) px(ctx,ax+flip*i,ay+Math.round(wag*0.3),col);
+    for(let i=0;i<3+len;i++) px(ctx,ax+flip*(i+1),ay-1+Math.round(wag*0.3),light);
+    for(let i=0;i<2+len;i++) px(ctx,ax+flip*(i+1),ay+1+Math.round(wag*0.3),light);
+  }
+}
+
+function drawExtra(ctx, extra, hx, hy, hw, hh, bx, by, bw, bh, sc, frame, p) {
+  const t=frame;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const bob=Math.sin(t*4.8)*0.5;
+
+  if(extra==="none") return;
+  if(extra==="big_horn_L"){
+    for(let i=0;i<4+Math.round(2*sc);i++) px(ctx,hx-1+i,hy-2-i,dark);
+    px(ctx,hx-1,hy-1+Math.round(4*sc),acc);
+  } else if(extra==="big_horn_R"){
+    for(let i=0;i<4+Math.round(2*sc);i++) px(ctx,hx+hw+i,hy-2-i,dark);
+    px(ctx,hx+hw+4+Math.round(2*sc),hy-2-4-Math.round(2*sc),acc);
+  } else if(extra==="center_horn"){
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw/2),hy-1-i,i<2?acc:dark);
+  } else if(extra==="giant_ear_L"){
+    rect(ctx,hx-3,hy-2,3,6,col);
+    rect(ctx,hx-4,hy-3,2,8,dark);
+    px(ctx,hx-3,hy,light);
+  } else if(extra==="giant_ear_R"){
+    rect(ctx,hx+hw,hy-2,3,6,col);
+    rect(ctx,hx+hw+2,hy-3,2,8,dark);
+    px(ctx,hx+hw+1,hy,light);
+  } else if(extra==="shoulder_spike_L"){
+    px(ctx,bx-1,by-1,dark); px(ctx,bx-2,by-2,dark); px(ctx,bx-3,by-3,acc);
+  } else if(extra==="shoulder_spike_R"){
+    px(ctx,bx+bw,by-1,dark); px(ctx,bx+bw+1,by-2,dark); px(ctx,bx+bw+2,by-3,acc);
+  } else if(extra==="back_fin"){
+    for(let i=1;i<bw-1;i+=2){ const h2=3+Math.round(Math.sin(i*0.7)*2); for(let j=0;j<h2;j++) px(ctx,bx+i,by-1-j,j===0?dark:acc); }
+  } else if(extra==="back_sail"){
+    for(let i=0;i<bw;i++){ const h2=2+Math.round(i/bw*6); for(let j=0;j<h2;j++) px(ctx,bx+i,by-1-j,j===0?dark:i%2===0?acc:col); }
+  } else if(extra==="back_spines"){
+    for(let i=2;i<bw-2;i+=3){ px(ctx,bx+i,by-1,dark); px(ctx,bx+i,by-2,acc); }
+  } else if(extra==="antenna_cluster"){
+    for(let i=0;i<3;i++){
+      const ox=(i-1)*3;
+      for(let j=0;j<4;j++) px(ctx,hx+Math.round(hw/2)+ox+Math.round(Math.sin(t*4.8+i)*1),hy-1-j,j===0?dark:acc);
+      px(ctx,hx+Math.round(hw/2)+ox+Math.round(Math.sin(t*4.8+i)*1),hy-5,light);
+    }
+  } else if(extra==="mono_antenna"){
+    for(let j=0;j<5;j++) px(ctx,hx+Math.round(hw/2)+Math.round(Math.sin(t*3.6)*1),hy-1-j,j===0?dark:j<4?acc:light);
+  } else if(extra==="parasite_head"){
+    // tiny second head on shoulder
+    rect(ctx,bx+bw+1,by,3,3,dark);
+    px(ctx,bx+bw+2,by+1,acc);
+    px(ctx,bx+bw+1,by+1,light);
+  } else if(extra==="mini_arm_back"){
+    rect(ctx,bx+Math.round(bw/2)-1,by-2,2,4,dark);
+    rect(ctx,bx+Math.round(bw/2)-2,by-2,4,2,dark);
+  } else if(extra==="biolume_sac"){
+    const glow=0.5+Math.sin(t*4.2)*0.5;
+    rect(ctx,bx+bw-3,by+bh-4,4,4,acc);
+    ctx.globalAlpha=glow*0.6;
+    rect(ctx,bx+bw-4,by+bh-5,6,6,light);
+    ctx.globalAlpha=1;
+  } else if(extra==="crystal_growth"){
+    rect(ctx,bx+2,by-3,2,4,light);
+    rect(ctx,bx+4,by-4,2,5,acc);
+    rect(ctx,bx+6,by-2,2,3,light);
+  } else if(extra==="eyestalk_L"){
+    for(let j=0;j<4;j++) px(ctx,hx-1+Math.round(Math.sin(t*4.2)*1),hy-j,dark);
+    px(ctx,hx-1,hy-4,p.eye); px(ctx,hx-1,hy-4,p.pupil);
+  } else if(extra==="eyestalk_R"){
+    for(let j=0;j<4;j++) px(ctx,hx+hw+Math.round(Math.sin(t*4.2+1)*1),hy-j,dark);
+    px(ctx,hx+hw,hy-4,p.eye); px(ctx,hx+hw,hy-4,p.pupil);
+  } else if(extra==="big_wing_L"){
+    // Single large wing left side — impressive
+    for(let i=0;i<8+Math.round(3*sc);i++){
+      const spread=Math.round(Math.sin(i*0.3+t*1.5)*1.5);
+      rect(ctx,bx-3-i+spread,by+1+i*0.4,Math.max(1,3-Math.floor(i/4)),2,i<4?light:i<7?col:dark);
+    }
+    // Wing membrane
+    for(let i=2;i<7;i++) px(ctx,bx-2-i,by+1+Math.round(i*0.6)+Math.round(Math.sin(t*4.8)*1),acc);
+  } else if(extra==="big_wing_R"){
+    for(let i=0;i<8+Math.round(3*sc);i++){
+      const spread=Math.round(Math.sin(i*0.3+t*1.5)*1.5);
+      rect(ctx,bx+bw+i-spread,by+1+i*0.4,Math.max(1,3-Math.floor(i/4)),2,i<4?light:i<7?col:dark);
+    }
+    for(let i=2;i<7;i++) px(ctx,bx+bw+1+i,by+1+Math.round(i*0.6)+Math.round(Math.sin(t*4.8)*1),acc);
+  } else if(extra==="tumor_blob"){
+    rect(ctx,bx+bw-2,by+2,4,4,acc);
+    rect(ctx,bx+bw-1,by+1,3,2,col);
+    px(ctx,bx+bw,by+1,light);
+  } else if(extra==="shell_back"){
+    rect(ctx,bx+1,by,bw-2,Math.round(bh*0.5),acc);
+    rect(ctx,bx+2,by+1,bw-4,Math.round(bh*0.35),col);
+    for(let i=2;i<bw-2;i+=3) px(ctx,bx+i,by,dark);
+  } else if(extra==="mech_arm_back"){
+    rect(ctx,bx-3,by-2,2,8,dark);
+    rect(ctx,bx-5,by-2,3,2,"#90a4ae");
+    px(ctx,bx-6,by-1,"#ffeb3b");
+  } else if(extra==="exhaust_pipe"){
+    rect(ctx,bx+bw-1,by+2,3,2,"#546e7a");
+    if(Math.sin(t*0.2)>0.3){ px(ctx,bx+bw+2,by+1,"#90a4ae"); px(ctx,bx+bw+2,by,"rgba(200,200,200,0.5)"); }
+  } else if(extra==="glow_node"){
+    const g=0.4+Math.sin(t*0.1)*0.6;
+    px(ctx,bx+Math.round(bw/2),by+Math.round(bh/2),light);
+    ctx.globalAlpha=g*0.7;
+    rect(ctx,bx+Math.round(bw/2)-1,by+Math.round(bh/2)-1,3,3,light);
+    ctx.globalAlpha=1;
+  } else if(extra==="jaw_extension"){
+    rect(ctx,hx+1,hy+hh,hw-2,3,dark);
+    for(let i=1;i<hw-1;i+=2) px(ctx,hx+i,hy+hh+3,acc);
+  } else if(extra==="neck_frill"){
+    for(let i=0;i<hw;i+=2) rect(ctx,hx+i,hy+hh-1,2,3+Math.round(Math.sin(t*4.8+i)*1),i%4===0?acc:col);
+  } else if(extra==="head_crest"){
+    for(let i=0;i<hw;i+=2){ const h2=2+Math.round((i<hw/2?i:hw-i)*0.5); for(let j=0;j<h2;j++) px(ctx,hx+i,hy-1-j,j===0?dark:acc); }
+  } else if(extra==="thorn_row"){
+    for(let i=1;i<bw-1;i+=2){ px(ctx,bx+i,by-1,dark); if(i%4===0) px(ctx,bx+i,by-2,acc); }
+  } else if(extra==="bubble_cluster"){
+    [[bx+bw-1,by+1],[bx+bw,by+3],[bx+bw-2,by+4]].forEach(([x,y],i)=>{
+      const g=0.5+Math.sin(t*4.2+i)*0.5;
+      ctx.globalAlpha=g*0.8; px(ctx,x,y,light); ctx.globalAlpha=1;
+    });
+  } else if(extra==="dangling_eye"){
+    for(let j=0;j<3;j++) px(ctx,hx+Math.round(hw*0.7),hy+hh+j,dark);
+    px(ctx,hx+Math.round(hw*0.7),hy+hh+3,p.eye);
+  } else if(extra==="face_tentacle"){
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw/2)+Math.round(Math.sin(t*2.0+i)*1.5),hy+hh+i,i%2===0?acc:col);
+  } else if(extra==="shoulder_mouth"){
+    rect(ctx,bx-1,by+2,3,2,dark);
+    px(ctx,bx,by+2,acc);
+  } else if(extra==="chest_eye"){
+    px(ctx,bx+Math.round(bw/2),by+Math.round(bh*0.4),p.eye);
+    px(ctx,bx+Math.round(bw/2),by+Math.round(bh*0.4),p.pupil);
+  } else if(extra==="vestigial_twin"){
+    // Tiny shrunken clone attached to side
+    rect(ctx,bx+bw+1,by+2,4,5,col);
+    px(ctx,bx+bw+2,by+2,p.eye); px(ctx,bx+bw+3,by+3,dark);
+  } else if(extra==="spine_ridge"){
+    for(let i=0;i<bh;i+=2) px(ctx,bx+Math.round(bw/2),by+i,dark);
+  } else if(extra==="radio_antenna"){
+    for(let j=0;j<6;j++) px(ctx,hx+Math.round(hw*0.8)+Math.round(j%2)*1,hy-j,"#90a4ae");
+    px(ctx,hx+Math.round(hw*0.8),hy-6,"#f44336");
+  } else if(extra==="eye_tower"){
+    for(let j=0;j<5;j++) px(ctx,hx+Math.round(hw/2),hy-j,dark);
+    rect(ctx,hx+Math.round(hw/2)-1,hy-6,3,2,p.eye);
+    px(ctx,hx+Math.round(hw/2),hy-6,p.pupil);
+  }
+}
+
+// ─── ANIMAL PART DRAWERS ──────────────────────────────────────────────────────
+
+function drawEars(ctx, earType, hx, hy, hw, hh, t, p) {
+  if(!earType||earType==="none") return;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const earWag = Math.sin(t*4.2)*1;
+
+  if(earType==="cat_ears"){
+    // Pointed triangles
+    for(let i=0;i<4;i++) px(ctx,hx+1+i,hy-1-i,dark);
+    for(let i=0;i<3;i++) px(ctx,hx+2+i,hy-i,col);
+    for(let i=0;i<4;i++) px(ctx,hx+hw-2-i,hy-1-i,dark);
+    for(let i=0;i<3;i++) px(ctx,hx+hw-3-i,hy-i,col);
+  } else if(earType==="dog_floppy"){
+    // Drooping rounded ears
+    rect(ctx,hx-2,hy,3,5+Math.round(earWag),dark);
+    rect(ctx,hx-1,hy+1,2,3,col);
+    rect(ctx,hx+hw-1,hy,3,5-Math.round(earWag),dark);
+    rect(ctx,hx+hw,hy+1,2,3,col);
+  } else if(earType==="rabbit_long"){
+    // Very tall upright
+    for(let i=0;i<8;i++) rect(ctx,hx+2,hy-1-i,3,1,i===0?dark:col);
+    rect(ctx,hx+3,hy-8,1,7,light);
+    for(let i=0;i<8;i++) rect(ctx,hx+hw-5,hy-1-i,3,1,i===0?dark:col);
+    rect(ctx,hx+hw-4,hy-8,1,7,light);
+  } else if(earType==="bear_round"){
+    rect(ctx,hx,hy-2,3,3,dark); px(ctx,hx+1,hy-2,col);
+    rect(ctx,hx+hw-3,hy-2,3,3,dark); px(ctx,hx+hw-2,hy-2,col);
+  } else if(earType==="mouse_round"){
+    rect(ctx,hx+1,hy-3,4,4,dark); rect(ctx,hx+2,hy-3,2,3,col);
+    rect(ctx,hx+hw-5,hy-3,4,4,dark); rect(ctx,hx+hw-4,hy-3,2,3,col);
+  } else if(earType==="horse_upright"){
+    for(let i=0;i<5;i++) rect(ctx,hx+2+i,hy-1-Math.round(i*0.8),2-Math.floor(i/4),1,i<3?col:dark);
+    for(let i=0;i<5;i++) rect(ctx,hx+hw-4-i,hy-1-Math.round(i*0.8),2-Math.floor(i/4),1,i<3?col:dark);
+  } else if(earType==="cow_side"){
+    // Wide horizontal floppy
+    rect(ctx,hx-4,hy+1,5,3,dark); rect(ctx,hx-3,hy+2,3,1,col);
+    rect(ctx,hx+hw-1,hy+1,5,3,dark); rect(ctx,hx+hw,hy+2,3,1,col);
+  } else if(earType==="bat_wing_ear"){
+    for(let i=0;i<5;i++){ px(ctx,hx-i,hy-i+Math.round(earWag),i<2?dark:col); px(ctx,hx-i-1,hy-i+1+Math.round(earWag),col); }
+    for(let i=0;i<5;i++){ px(ctx,hx+hw+i,hy-i+Math.round(earWag),i<2?dark:col); px(ctx,hx+hw+i+1,hy-i+1+Math.round(earWag),col); }
+  } else if(earType==="fox_pointed"){
+    for(let i=0;i<5;i++) px(ctx,hx+1+i,hy-i,i===0?dark:i<3?acc:col);
+    for(let i=0;i<5;i++) px(ctx,hx+hw-2-i,hy-i,i===0?dark:i<3?acc:col);
+  } else if(earType==="pig_floppy"){
+    rect(ctx,hx,hy-1,4,3,dark); rect(ctx,hx+1,hy-1,2,2,col);
+    rect(ctx,hx+hw-4,hy-1,4,3,dark); rect(ctx,hx+hw-3,hy-1,2,2,col);
+  } else if(earType==="elephant_flap"){
+    // Giant side flap
+    rect(ctx,hx-5,hy-1,6,8,dark); rect(ctx,hx-4,hy,4,6,col); rect(ctx,hx-3,hy+1,2,4,light);
+    rect(ctx,hx+hw-1,hy-1,6,8,dark); rect(ctx,hx+hw,hy,4,6,col); rect(ctx,hx+hw+1,hy+1,2,4,light);
+  } else if(earType==="deer_side"){
+    rect(ctx,hx-3,hy,3,4,dark); rect(ctx,hx-2,hy+1,1,2,col);
+    rect(ctx,hx+hw,hy,3,4,dark); rect(ctx,hx+hw+1,hy+1,1,2,col);
+  } else if(earType==="wolf_pointed"){
+    for(let i=0;i<4;i++) px(ctx,hx+1+i,hy-2-i,i===0?dark:col);
+    px(ctx,hx+2,hy-2,light);
+    for(let i=0;i<4;i++) px(ctx,hx+hw-2-i,hy-2-i,i===0?dark:col);
+    px(ctx,hx+hw-3,hy-2,light);
+  } else if(earType==="lion_round"){
+    rect(ctx,hx-1,hy-2,4,3,acc); rect(ctx,hx,hy-2,2,2,dark);
+    rect(ctx,hx+hw-3,hy-2,4,3,acc); rect(ctx,hx+hw-2,hy-2,2,2,dark);
+  } else if(earType==="fennec_giant"){
+    // Absurdly huge
+    rect(ctx,hx-3,hy-8,5,9,dark); rect(ctx,hx-2,hy-7,3,8,col); rect(ctx,hx-1,hy-6,1,6,light);
+    rect(ctx,hx+hw-2,hy-8,5,9,dark); rect(ctx,hx+hw-1,hy-7,3,8,col); rect(ctx,hx+hw,hy-6,1,6,light);
+  } else if(earType==="fin_ear"){
+    for(let i=0;i<4;i++) px(ctx,hx-1-i,hy-i,acc);
+    for(let i=0;i<4;i++) px(ctx,hx+hw+i,hy-i,acc);
+  } else if(earType==="tattered"){
+    rect(ctx,hx-1,hy-3,3,4,dark); px(ctx,hx,hy-4,dark); px(ctx,hx-1,hy-2,col);
+    rect(ctx,hx+hw-2,hy-3,3,4,dark); px(ctx,hx+hw-1,hy-4,dark); px(ctx,hx+hw,hy-2,col);
+  } else if(earType==="satellite_dish"){
+    rect(ctx,hx-3,hy-4,4,4,dark); rect(ctx,hx-2,hy-3,3,3,"#90a4ae"); px(ctx,hx-1,hy-3,"#ffeb3b");
+  } else if(earType==="leaf_ear"){
+    for(let i=0;i<5;i++){ rect(ctx,hx-1-i,hy-1-i,2,1,acc); rect(ctx,hx+hw-1+i,hy-1-i,2,1,acc); }
+  } else if(earType==="horn_ear"){
+    for(let i=0;i<5;i++){ px(ctx,hx+2,hy-i,i<2?dark:acc); px(ctx,hx+hw-3,hy-i,i<2?dark:acc); }
+  }
+}
+
+function drawHorns(ctx, hornType, hx, hy, hw, hh, t, p) {
+  if(!hornType||hornType==="none") return;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const sway=Math.sin(t*3.0)*0.5;
+
+  if(hornType==="deer_antler"){
+    // Left antler
+    for(let i=0;i<5;i++) px(ctx,hx+2-Math.round(i*0.3),hy-2-i,dark);
+    px(ctx,hx+1,hy-4,dark); px(ctx,hx,hy-5,dark);
+    px(ctx,hx+3,hy-4,dark); px(ctx,hx+4,hy-5,dark); px(ctx,hx+4,hy-6,dark);
+    // Right antler (mirror)
+    for(let i=0;i<5;i++) px(ctx,hx+hw-3+Math.round(i*0.3),hy-2-i,dark);
+    px(ctx,hx+hw-2,hy-4,dark); px(ctx,hx+hw-1,hy-5,dark);
+    px(ctx,hx+hw-4,hy-4,dark); px(ctx,hx+hw-5,hy-5,dark); px(ctx,hx+hw-5,hy-6,dark);
+  } else if(hornType==="moose_antler"){
+    for(let i=0;i<4;i++) px(ctx,hx+2,hy-2-i,dark);
+    rect(ctx,hx-1,hy-6,5,1,dark);
+    px(ctx,hx-1,hy-7,dark); px(ctx,hx+1,hy-7,dark); px(ctx,hx+3,hy-7,dark);
+    for(let i=0;i<4;i++) px(ctx,hx+hw-3,hy-2-i,dark);
+    rect(ctx,hx+hw-4,hy-6,5,1,dark);
+    px(ctx,hx+hw-4,hy-7,dark); px(ctx,hx+hw-2,hy-7,dark); px(ctx,hx+hw,hy-7,dark);
+  } else if(hornType==="bull_horns"){
+    for(let i=0;i<4;i++) px(ctx,hx-i,hy-1+i,dark);
+    for(let i=0;i<4;i++) px(ctx,hx+hw-1+i,hy-1+i,dark);
+  } else if(hornType==="ram_curl"){
+    for(let i=0;i<6;i++){
+      const angle=i*0.5;
+      px(ctx,hx-1+Math.round(Math.cos(angle)*2),hy-1+Math.round(Math.sin(angle)*2),dark);
+    }
+    for(let i=0;i<6;i++){
+      const angle=i*0.5+Math.PI;
+      px(ctx,hx+hw+Math.round(Math.cos(angle)*2),hy-1+Math.round(Math.sin(angle)*2),dark);
+    }
+  } else if(hornType==="rhino_horn"){
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw/2)-Math.round(i*0.2),hy-1-i,i<2?dark:acc);
+    px(ctx,hx+Math.round(hw/2),hy-6,light);
+  } else if(hornType==="unicorn_spiral"){
+    for(let i=0;i<7;i++){
+      const twist=Math.round(Math.sin(i*0.9)*1);
+      px(ctx,hx+Math.round(hw/2)+twist,hy-1-i,i%2===0?light:acc);
+    }
+  } else if(hornType==="triceratops_three"){
+    for(let i=0;i<4;i++) px(ctx,hx+2,hy-1-i,dark);
+    for(let i=0;i<4;i++) px(ctx,hx+hw-3,hy-1-i,dark);
+    for(let i=0;i<3;i++) px(ctx,hx+Math.round(hw/2),hy-1-i,acc);
+  } else if(hornType==="goat_short"){
+    px(ctx,hx+2,hy-1,dark); px(ctx,hx+2,hy-2,dark); px(ctx,hx+1,hy-3,dark);
+    px(ctx,hx+hw-3,hy-1,dark); px(ctx,hx+hw-3,hy-2,dark); px(ctx,hx+hw-2,hy-3,dark);
+  } else if(hornType==="ibex_long"){
+    for(let i=0;i<6;i++) px(ctx,hx+1+Math.round(i*0.3),hy-1-i,dark);
+    for(let i=0;i<6;i++) px(ctx,hx+hw-2-Math.round(i*0.3),hy-1-i,dark);
+  } else if(hornType==="narwhal_tusk"){
+    for(let i=0;i<8;i++) px(ctx,hx+Math.round(hw/2)+Math.round(i*0.15),hy+Math.round(hh/2)-i,i<2?dark:i%2===0?light:acc);
+  } else if(hornType==="beetle_horn"){
+    for(let i=0;i<4;i++) px(ctx,hx+Math.round(hw/2),hy-1-i,dark);
+    rect(ctx,hx+Math.round(hw/2)-2,hy-4,5,2,dark);
+  } else if(hornType==="stag_beetle"){
+    rect(ctx,hx+1,hy+hh-2,2,4,dark); px(ctx,hx,hy+hh+2,dark); px(ctx,hx+3,hy+hh+2,dark);
+    rect(ctx,hx+hw-3,hy+hh-2,2,4,dark); px(ctx,hx+hw-4,hy+hh+2,dark); px(ctx,hx+hw-1,hy+hh+2,dark);
+  } else if(hornType==="lightning_horn"){
+    px(ctx,hx+Math.round(hw/2),hy-1,"#ffeb3b");
+    px(ctx,hx+Math.round(hw/2)+1,hy-2,"#ffeb3b");
+    px(ctx,hx+Math.round(hw/2),hy-3,"#ffeb3b");
+    px(ctx,hx+Math.round(hw/2)-1,hy-4,"#fff176");
+    px(ctx,hx+Math.round(hw/2),hy-5,"#fff176");
+  } else if(hornType==="crystal_spike"){
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw/2),hy-1-i,i===0?dark:i%2===0?light:acc);
+    px(ctx,hx+Math.round(hw/2)-1,hy-3,light);
+  } else if(hornType==="double_spiral"){
+    for(let i=0;i<4;i++){ const a=i*0.7; px(ctx,hx+1+Math.round(Math.cos(a)),hy-1-i+Math.round(Math.sin(a)),dark); }
+    for(let i=0;i<4;i++){ const a=i*0.7+Math.PI; px(ctx,hx+hw-2+Math.round(Math.cos(a)),hy-1-i+Math.round(Math.sin(a)),dark); }
+  } else if(hornType==="broken_horn"){
+    for(let i=0;i<4;i++) px(ctx,hx+2,hy-1-i,dark);
+    // Broken stump on other side
+    for(let i=0;i<2;i++) px(ctx,hx+hw-3,hy-1-i,dark);
+    px(ctx,hx+hw-4,hy-2,"#ef9a9a");
+  } else if(hornType==="alien_stalk"){
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw/2)+Math.round(Math.sin(t*3.6+i)*1),hy-1-i,acc);
+    rect(ctx,hx+Math.round(hw/2)-1,hy-6,3,2,light);
+  }
+}
+
+function drawSnout(ctx, snoutType, hx, hy, hw, hh, t, p) {
+  if(!snoutType||snoutType==="none") return;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const my=hy+Math.round(hh*0.55); // mouth zone
+
+  if(snoutType==="dog_snout"){
+    rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),3,col);
+    rect(ctx,hx+Math.round(hw*0.25),my,Math.round(hw*0.5),2,dark);
+    // Nose
+    rect(ctx,hx+Math.round(hw/2)-1,my-1,3,2,dark);
+    px(ctx,hx+Math.round(hw/2),my-2,dark);
+  } else if(snoutType==="pig_snout"){
+    rect(ctx,hx+Math.round(hw*0.25),my,Math.round(hw*0.5),3,col);
+    // Round snout end with nostrils
+    px(ctx,hx+Math.round(hw*0.35),my+1,dark); px(ctx,hx+Math.round(hw*0.6),my+1,dark);
+    rect(ctx,hx+Math.round(hw*0.2),my+1,2,2,dark);
+    rect(ctx,hx+Math.round(hw*0.75),my+1,2,2,dark);
+  } else if(snoutType==="elephant_trunk"){
+    // Long drooping trunk
+    const trunkSway=Math.round(Math.sin(t*3.6)*2);
+    rect(ctx,hx+Math.round(hw*0.35),my,Math.round(hw*0.3),2,dark);
+    for(let i=0;i<7;i++){
+      const tw=Math.max(1,3-Math.floor(i/4));
+      rect(ctx,hx+Math.round(hw/2)-1+Math.round(Math.sin(i*0.5)*1)+trunkSway,my+1+i,tw,1,i%2===0?dark:col);
+    }
+    // Tip
+    rect(ctx,hx+Math.round(hw/2)-1+trunkSway,my+8,3,2,dark);
+  } else if(snoutType==="horse_muzzle"){
+    rect(ctx,hx+Math.round(hw*0.15),my,Math.round(hw*0.7),4,col);
+    rect(ctx,hx+Math.round(hw*0.2),my+1,Math.round(hw*0.6),2,dark);
+    px(ctx,hx+Math.round(hw*0.3),my,light); px(ctx,hx+Math.round(hw*0.65),my,light);
+  } else if(snoutType==="bear_snout"){
+    rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),3,col);
+    rect(ctx,hx+Math.round(hw/2)-1,my-1,3,2,dark);
+  } else if(snoutType==="duck_bill"){
+    rect(ctx,hx+Math.round(hw*0.15),my,Math.round(hw*0.7),2,"#f9a825");
+    rect(ctx,hx+Math.round(hw*0.15),my+2,Math.round(hw*0.7),2,"#ef6c00");
+    px(ctx,hx+Math.round(hw*0.1),my+1,"#f9a825"); px(ctx,hx+Math.round(hw*0.85),my+1,"#f9a825");
+  } else if(snoutType==="anteater"){
+    for(let i=0;i<10;i++){
+      const w=Math.max(1,3-Math.floor(i/4));
+      rect(ctx,hx+Math.round(hw*0.4)+i,my+Math.round(i*0.3),w,1,dark);
+    }
+    // Tongue flick
+    if(Math.sin(t*2.5)>0.5) px(ctx,hx+Math.round(hw*0.4)+10,my+3,"#f44336");
+  } else if(snoutType==="platypus"){
+    rect(ctx,hx+Math.round(hw*0.1),my+1,Math.round(hw*0.8),3,"#795548");
+    rect(ctx,hx+Math.round(hw*0.1),my,Math.round(hw*0.8),1,dark);
+  } else if(snoutType==="rhino_horn_snout"){
+    rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),3,col);
+    for(let i=0;i<4;i++) px(ctx,hx+Math.round(hw/2),my-1-i,dark);
+  } else if(snoutType==="cat_flat"){
+    // Tiny flat nose, whiskers
+    px(ctx,hx+Math.round(hw/2),my,dark); px(ctx,hx+Math.round(hw/2)+1,my,dark);
+    // Whiskers
+    for(let i=0;i<3;i++){ px(ctx,hx-1-i,my+1+Math.round(i*0.3),dark); px(ctx,hx+hw+i,my+1+Math.round(i*0.3),dark); }
+  } else if(snoutType==="wolf_muzzle"){
+    rect(ctx,hx+Math.round(hw*0.15),my,Math.round(hw*0.7),3,col);
+    rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),2,dark);
+    px(ctx,hx+Math.round(hw/2)-1,my-1,2,dark);
+  } else if(snoutType==="frog_wide_mouth"){
+    rect(ctx,hx,my,hw,2,dark);
+    if(Math.sin(t*0.1)>0.3){ rect(ctx,hx+1,my+1,hw-2,2,col); }
+  } else if(snoutType==="tube_snout"){
+    for(let i=0;i<6;i++) px(ctx,hx+Math.round(hw/2)+Math.round(i*0.5),my+i,i%2===0?dark:acc);
+  } else if(snoutType==="drill_nose"){
+    for(let i=0;i<5;i++){
+      const twist=Math.round(Math.sin(t*0.2+i)*1);
+      px(ctx,hx+Math.round(hw/2)+twist,my+i,"#90a4ae");
+    }
+  } else if(snoutType==="beak_curved"){
+    rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),2,"#ef6c00");
+    for(let i=0;i<4;i++) px(ctx,hx+Math.round(hw*0.75)+i,my+1+Math.round(i*0.5),"#e65100");
+  } else if(snoutType==="rabbit_twitch"){
+    px(ctx,hx+Math.round(hw/2),my,dark); 
+    const twitch=Math.sin(t*2.0)>0.7?1:0;
+    px(ctx,hx+Math.round(hw/2)-1,my+twitch,"#f48fb1"); px(ctx,hx+Math.round(hw/2)+1,my+twitch,"#f48fb1");
+    for(let i=0;i<3;i++){ px(ctx,hx-1-i,my+1,dark); px(ctx,hx+hw+i,my+1,dark); }
+  }
+}
+
+function drawFeet(ctx, feetType, bx, by, bw, bh, sc, t, p) {
+  if(!feetType||feetType==="none") return;
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const fy=by+bh;
+  const lx=bx+Math.round(2*sc), rx=bx+bw-Math.round(5*sc);
+  const fh=Math.max(2,Math.round(3*sc));
+
+  if(feetType==="hooves"){
+    rect(ctx,lx,fy,Math.round(3*sc),fh,dark);
+    rect(ctx,lx,fy+fh-1,Math.round(3*sc),1,"#212121");
+    rect(ctx,rx,fy,Math.round(3*sc),fh,dark);
+    rect(ctx,rx,fy+fh-1,Math.round(3*sc),1,"#212121");
+  } else if(feetType==="bird_talons"){
+    // Three-toed claw
+    rect(ctx,lx,fy,2,fh,dark);
+    px(ctx,lx-1,fy+fh,acc); px(ctx,lx+1,fy+fh,acc); px(ctx,lx+2,fy+fh,acc);
+    rect(ctx,rx,fy,2,fh,dark);
+    px(ctx,rx-1,fy+fh,acc); px(ctx,rx+1,fy+fh,acc); px(ctx,rx+2,fy+fh,acc);
+  } else if(feetType==="duck_webbed"){
+    rect(ctx,lx,fy,4,2,"#f9a825");
+    rect(ctx,lx-1,fy+1,6,1,"#ef6c00");
+    rect(ctx,rx,fy,4,2,"#f9a825");
+    rect(ctx,rx-1,fy+1,6,1,"#ef6c00");
+  } else if(feetType==="cat_paws"){
+    rect(ctx,lx,fy,4,2,col); rect(ctx,lx,fy+1,4,1,dark);
+    for(let i=0;i<3;i++) px(ctx,lx+i,fy+2,dark);
+    rect(ctx,rx,fy,4,2,col); rect(ctx,rx,fy+1,4,1,dark);
+    for(let i=0;i<3;i++) px(ctx,rx+i,fy+2,dark);
+  } else if(feetType==="bear_paws"){
+    rect(ctx,lx-1,fy,5,3,dark); for(let i=0;i<4;i++) px(ctx,lx-1+i,fy+3,dark);
+    rect(ctx,rx-1,fy,5,3,dark); for(let i=0;i<4;i++) px(ctx,rx-1+i,fy+3,dark);
+  } else if(feetType==="frog_webbed"){
+    rect(ctx,lx,fy,4,2,acc); rect(ctx,lx-1,fy+1,6,2,acc);
+    px(ctx,lx-2,fy+2,dark); px(ctx,lx+4,fy+2,dark);
+    rect(ctx,rx,fy,4,2,acc); rect(ctx,rx-1,fy+1,6,2,acc);
+    px(ctx,rx-2,fy+2,dark); px(ctx,rx+4,fy+2,dark);
+  } else if(feetType==="insect_spike"){
+    for(let i=0;i<3;i++){ px(ctx,lx+i,fy,dark); px(ctx,lx+i,fy+1+i,dark); }
+    for(let i=0;i<3;i++){ px(ctx,rx+i,fy,dark); px(ctx,rx+i,fy+1+i,dark); }
+  } else if(feetType==="elephant_pad"){
+    rect(ctx,lx-1,fy,5,3,dark); rect(ctx,lx,fy,3,2,col); px(ctx,lx+1,fy+2,dark);
+    rect(ctx,rx-1,fy,5,3,dark); rect(ctx,rx,fy,3,2,col); px(ctx,rx+1,fy+2,dark);
+  } else if(feetType==="rabbit_big"){
+    rect(ctx,lx-1,fy,5,fh,col); rect(ctx,lx+2,fy,4,fh,col); // long big feet
+    rect(ctx,rx-1,fy,5,fh,col); rect(ctx,rx+2,fy,4,fh,col);
+    rect(ctx,lx-2,fy+fh-1,8,1,dark); rect(ctx,rx-2,fy+fh-1,8,1,dark);
+  } else if(feetType==="horse_single"){
+    rect(ctx,lx+1,fy,2,fh,dark); rect(ctx,lx,fy+fh-1,4,1,"#212121");
+    rect(ctx,rx+1,fy,2,fh,dark); rect(ctx,rx,fy+fh-1,4,1,"#212121");
+  } else if(feetType==="goat_split"){
+    px(ctx,lx,fy,dark); px(ctx,lx+2,fy,dark);
+    rect(ctx,lx,fy+1,1,fh-1,dark); rect(ctx,lx+2,fy+1,1,fh-1,dark);
+    px(ctx,rx,fy,dark); px(ctx,rx+2,fy,dark);
+    rect(ctx,rx,fy+1,1,fh-1,dark); rect(ctx,rx+2,fy+1,1,fh-1,dark);
+  } else if(feetType==="raptor_claw"){
+    rect(ctx,lx,fy,2,fh,dark); px(ctx,lx-2,fy+fh,acc); px(ctx,lx,fy+fh,acc); px(ctx,lx+2,fy+fh,acc);
+    rect(ctx,rx,fy,2,fh,dark); px(ctx,rx-2,fy+fh,acc); px(ctx,rx,fy+fh,acc); px(ctx,rx+2,fy+fh,acc);
+  } else if(feetType==="suction_cups"){
+    rect(ctx,lx,fy,3,fh,dark); rect(ctx,lx,fy+fh-1,3,1,light);
+    rect(ctx,rx,fy,3,fh,dark); rect(ctx,rx,fy+fh-1,3,1,light);
+  } else if(feetType==="spring_coil"){
+    for(let i=0;i<fh;i++){ px(ctx,lx+i%2,fy+i,acc); px(ctx,rx+i%2,fy+i,acc); }
+  } else if(feetType==="blade_feet"){
+    for(let i=0;i<fh;i++) px(ctx,lx+1,fy+i,"#90a4ae");
+    px(ctx,lx,fy+fh-1,"#cfd8dc"); px(ctx,lx+2,fy+fh-1,"#cfd8dc");
+    for(let i=0;i<fh;i++) px(ctx,rx+1,fy+i,"#90a4ae");
+    px(ctx,rx,fy+fh-1,"#cfd8dc"); px(ctx,rx+2,fy+fh-1,"#cfd8dc");
+  } else if(feetType==="wheel_feet"){
+    rect(ctx,lx,fy,3,3,dark); px(ctx,lx+1,fy+1,"#90a4ae");
+    rect(ctx,rx,fy,3,3,dark); px(ctx,rx+1,fy+1,"#90a4ae");
+  }
+}
+
+function drawPattern(ctx, patternType, bx, by, bw, bh, t, p) {
+  if(!patternType||patternType==="none") return;
+  const dark=p.dark, light=p.light, acc=p.accent||dark;
+
+  if(patternType==="tiger_stripes"){
+    for(let i=1;i<bw-1;i+=3) rect(ctx,bx+i,by+1,1,bh-2,dark);
+  } else if(patternType==="leopard_spots"){
+    [[2,2],[6,4],[3,7],[8,2],[5,6],[1,5],[7,7]].forEach(([dx,dy])=>{
+      if(dx<bw-1&&dy<bh-1){ rect(ctx,bx+dx,by+dy,2,2,dark); px(ctx,bx+dx+1,by+dy+1,light); }
+    });
+  } else if(patternType==="zebra_stripes"){
+    for(let j=1;j<bh-1;j+=3) rect(ctx,bx+1,by+j,bw-2,1,dark);
+  } else if(patternType==="giraffe_patches"){
+    [[1,1,3,3],[5,2,4,4],[2,6,3,4],[7,1,3,5],[4,6,4,3]].forEach(([dx,dy,dw,dh])=>{
+      if(dx+dw<bw&&dy+dh<bh) rect(ctx,bx+dx,by+dy,Math.min(dw,bw-dx-1),Math.min(dh,bh-dy-1),acc);
+    });
+  } else if(patternType==="dalmatian"){
+    [[2,2],[7,1],[4,5],[1,6],[8,5],[5,2],[3,8]].forEach(([dx,dy])=>{
+      if(dx<bw-1&&dy<bh-1) rect(ctx,bx+dx,by+dy,2,2,"#212121");
+    });
+  } else if(patternType==="cow_patches"){
+    rect(ctx,bx+1,by+1,Math.round(bw*0.4),Math.round(bh*0.5),dark);
+    rect(ctx,bx+Math.round(bw*0.55),by+Math.round(bh*0.4),Math.round(bw*0.4),Math.round(bh*0.5),dark);
+  } else if(patternType==="cheetah_dots"){
+    [[2,1],[5,2],[1,4],[7,3],[3,6],[6,5],[4,3],[8,6]].forEach(([dx,dy])=>{
+      if(dx<bw-1&&dy<bh-1) px(ctx,bx+dx,by+dy,dark);
+    });
+  } else if(patternType==="snake_diamond"){
+    for(let j=0;j<bh-1;j+=3){
+      rect(ctx,bx+1,by+j,bw-2,1,dark);
+      rect(ctx,bx+Math.round(bw/2)-1,by+j+1,3,1,acc);
+    }
+  } else if(patternType==="fish_scales_pattern"){
+    for(let j=0;j<bh-1;j+=2) for(let i=j%2;i<bw-1;i+=2) px(ctx,bx+i,by+j,dark);
+  } else if(patternType==="peacock_eye"){
+    rect(ctx,bx+Math.round(bw/2)-1,by+Math.round(bh/2)-1,3,3,acc);
+    px(ctx,bx+Math.round(bw/2),by+Math.round(bh/2),dark);
+    px(ctx,bx+Math.round(bw/2),by+Math.round(bh/2),p.eye);
+  } else if(patternType==="bee_stripes"){
+    for(let j=0;j<bh;j+=2) rect(ctx,bx,by+j,bw,1,j%4===0?"#ffb300":dark);
+  } else if(patternType==="ladybug_dots"){
+    rect(ctx,bx+Math.round(bw/2)-1,by,2,bh,"#212121");
+    [[2,2],[bw-3,2],[2,bh-3],[bw-3,bh-3],[Math.round(bw/2)-2,Math.round(bh/2)]].forEach(([dx,dy])=>{
+      if(dx>=0&&dx<bw&&dy>=0&&dy<bh) px(ctx,bx+dx,by+dy,"#212121");
+    });
+  } else if(patternType==="circuit_lines"){
+    for(let i=2;i<bw-2;i+=4){ rect(ctx,bx+i,by+2,1,bh-4,"#ffeb3b"); if(i%8===0) px(ctx,bx+i-1,by+4,"#ffeb3b"); }
+  } else if(patternType==="lava_cracks"){
+    for(let j=1;j<bh-1;j+=3){ for(let i=0;i<3;i++) px(ctx,bx+1+j%bw+i,by+j,"#ff6f00"); }
+  } else if(patternType==="star_pattern"){
+    const cx2=bx+Math.round(bw/2), cy2=by+Math.round(bh/2);
+    for(let a=0;a<6;a++){ const angle=a*Math.PI/3; px(ctx,cx2+Math.round(Math.cos(angle)*3),cy2+Math.round(Math.sin(angle)*3),light); }
+  } else if(patternType==="eye_pattern"){
+    [[bx+2,by+2],[bx+bw-3,by+2],[bx+Math.round(bw/2),by+Math.round(bh/2)]].forEach(([ex,ey])=>{ px(ctx,ex,ey,p.eye); px(ctx,ex,ey,p.pupil); });
+  } else if(patternType==="void_spots"){
+    [[3,2],[7,4],[2,6],[bw-3,3],[Math.round(bw/2),5]].forEach(([dx,dy])=>{
+      if(dx<bw-1&&dy<bh-1) px(ctx,bx+dx,by+dy,"#000000");
+    });
+  }
+}
+
+function drawArm(ctx, armType, side, bx, by, bw, bh, sc, frame, aSwing, p) {
+  if(armType==="none") return;
+  const t=frame, col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const flip=side==="L"?-1:1;
+  const ox = side==="L" ? bx-2 : bx+bw;
+  const oy = by+Math.round(2*sc);
+  const as = side==="L" ? aSwing : -aSwing;
+
+  if(armType==="stubby"){
+    rect(ctx,ox,oy,2,2,dark);
+    rect(ctx,ox+flip,oy+2+as,1,Math.max(1,Math.round(2*sc)),dark);
+  } else if(armType==="clawed"){
+    rect(ctx,ox,oy,2,2,dark);
+    rect(ctx,ox+flip,oy+2+as,1,Math.max(1,Math.round(2*sc)),dark);
+    px(ctx,ox+flip*2,oy+3+Math.round(sc)+as,acc);
+  } else if(armType==="tentacle"){
+    for(let i=0;i<Math.round(5*sc);i++){
+      px(ctx,ox+flip*Math.round(Math.sin(t*2.0+i)*1.5),oy+i,i%2===0?acc:col);
+    }
+  } else if(armType==="wing"){
+    for(let i=0;i<Math.round(4*sc);i++){
+      px(ctx,ox-flip*i,oy+i+as,i<2?light:i<3?col:dark);
+    }
+  } else if(armType==="noodle"){
+    for(let i=0;i<Math.round(6*sc);i++){
+      px(ctx,ox+flip*Math.round(Math.sin(t*2.0+i+as*0.1)*2),oy+i,i%3===0?acc:col);
+    }
+  } else if(armType==="crab_claw"){
+    rect(ctx,ox,oy,3,2,dark);
+    rect(ctx,ox+flip*2,oy+as,2,3,dark);
+    px(ctx,ox+flip*3,oy-1+as,acc); px(ctx,ox+flip*3,oy+3+as,acc);
+  } else if(armType==="blade"){
+    rect(ctx,ox,oy,2,2,dark);
+    for(let i=0;i<4;i++) px(ctx,ox+flip*(i+1),oy+2-i+as,"#90a4ae");
+    px(ctx,ox+flip*4,oy-2+as,light);
+  } else if(armType==="root"){
+    for(let i=0;i<Math.round(4*sc);i++){
+      px(ctx,ox+flip*Math.round(Math.sin(i*0.8)*1),oy+i,dark);
+      if(i%2===0) px(ctx,ox+flip*(1+Math.round(Math.sin(i*0.8)*1)),oy+i,acc);
+    }
+  } else if(armType==="mechanical"){
+    rect(ctx,ox,oy,2,2,"#546e7a");
+    rect(ctx,ox+flip,oy+2+as,1,Math.max(1,Math.round(2*sc)),"#90a4ae");
+    px(ctx,ox+flip*2,oy+4+as,"#ffeb3b");
+  } else if(armType==="vestigial"){
+    rect(ctx,ox,oy+1,2,1,dark); px(ctx,ox+flip,oy+2,dark);
+  } else if(armType==="giant"){
+    rect(ctx,ox,oy,3,3,dark);
+    rect(ctx,ox+flip*2,oy+2+as,2,Math.max(2,Math.round(4*sc)),dark);
+    rect(ctx,ox+flip*3,oy+4+as,3,2,acc);
+  } else if(armType==="fin"){
+    for(let i=0;i<Math.round(3*sc);i++) px(ctx,ox+flip*i,oy+i+as,i%2===0?dark:col);
+  } else if(armType==="gorilla_knuckle"){
+    // Long thick arm, knuckle-walks
+    rect(ctx,ox,oy,3,3,dark);
+    rect(ctx,ox+flip*2,oy+3+as,2,Math.max(2,Math.round(4*sc)),dark);
+    rect(ctx,ox+flip*3,oy+5+as,4,2,dark); // knuckle pad
+  } else if(armType==="mantis_blade"){
+    rect(ctx,ox,oy,2,2,dark);
+    for(let i=0;i<5;i++) px(ctx,ox+flip*(i+1),oy+as-i,i<2?"#90a4ae":i<4?light:acc);
+    px(ctx,ox+flip*5,oy+as-5,light);
+  } else if(armType==="bear_arm"){
+    rect(ctx,ox,oy,3,2,dark);
+    rect(ctx,ox+flip,oy+2+as,2,Math.max(2,Math.round(3*sc)),dark);
+    // Claws
+    for(let i=0;i<3;i++) px(ctx,ox+flip*(i+1),oy+4+Math.round(3*sc)+as,acc);
+  } else if(armType==="t_rex_stubby"){
+    rect(ctx,ox,oy+1,3,2,dark);
+    rect(ctx,ox+flip,oy+3+as,2,2,dark);
+    px(ctx,ox+flip*2,oy+4+as,acc); px(ctx,ox+flip*2,oy+5+as,acc);
+  } else if(armType==="octopus_arm"){
+    for(let i=0;i<Math.round(7*sc);i++){
+      const w=Math.round(Math.sin(i*0.4)*2)*flip;
+      px(ctx,ox+flip*i*0.3+w,oy+i,i%3===0?light:acc);
+      if(i%3===0) px(ctx,ox+flip*i*0.3+w+flip,oy+i,dark); // sucker
+    }
+  } else if(armType==="lobster_pincer"){
+    rect(ctx,ox,oy,2,2,dark);
+    rect(ctx,ox+flip,oy+2+as,2,3,dark);
+    px(ctx,ox+flip*2,oy+1+as,acc); px(ctx,ox+flip*2,oy+5+as,acc);
+    px(ctx,ox+flip*3,oy+2+as,acc); px(ctx,ox+flip*3,oy+4+as,acc);
+  } else if(armType==="praying_mantis"){
+    // Folded forearm pointing up
+    rect(ctx,ox,oy,2,3,dark);
+    for(let i=0;i<4;i++) px(ctx,ox+flip*(i+1),oy-i+as,"#66bb6a");
+    px(ctx,ox+flip*5,oy-4+as,acc);
+  } else if(armType==="gorilla_arm"){
+    rect(ctx,ox,oy,3,2,dark);
+    rect(ctx,ox+flip,oy+2,2,Math.round(5*sc),dark);
+    rect(ctx,ox+flip*2,oy+Math.round(5*sc)+as,4,3,dark);
+  }
+}
+
+function drawLeg(ctx, legType, side, bx, by, bw, bh, sc, frame, lSwing, p) {
+  if(legType==="none") return;
+  const t=frame, col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+  const flip=side==="L"?1:-1;
+  const lx = side==="L" ? bx+Math.round(2*sc) : bx+bw-Math.round(5*sc);
+  const ly = by+bh;
+  const lh = Math.max(2,Math.round(4*sc));
+  const lo = side==="L" ? lSwing : -lSwing;
+
+  if(legType==="stubby"){
+    rect(ctx,lx,ly,Math.max(2,Math.round(3*sc)),lh-lo,dark);
+  } else if(legType==="clawed"){
+    rect(ctx,lx,ly,Math.max(2,Math.round(3*sc)),lh-lo,dark);
+    px(ctx,lx-1,ly+lh-lo,acc); px(ctx,lx+Math.round(3*sc),ly+lh-lo,acc);
+  } else if(legType==="tentacle"){
+    for(let i=0;i<lh+2;i++){
+      const wx=Math.round(Math.sin(t*4.8+i+ly)*1.5);
+      px(ctx,lx+wx,ly+i,i%2===0?acc:col);
+    }
+  } else if(legType==="spring"){
+    for(let i=0;i<lh;i++) px(ctx,lx+i%2,ly+i,i%2===0?dark:acc);
+  } else if(legType==="root"){
+    for(let i=0;i<lh;i++){ px(ctx,lx+Math.round(Math.sin(i*0.8)*1),ly+i,dark); }
+  } else if(legType==="hover_pad"){
+    const hoff=Math.round(Math.sin(t*0.1)*2);
+    rect(ctx,lx-1,ly+hoff,4,2,acc);
+    px(ctx,lx,ly+hoff+2,dark); px(ctx,lx+2,ly+hoff+2,dark);
+  } else if(legType==="wheel"){
+    rect(ctx,lx,ly,3,3,dark);
+    px(ctx,lx+1,ly+1,"#90a4ae");
+  } else if(legType==="peg"){
+    rect(ctx,lx+1,ly,1,lh,dark);
+    rect(ctx,lx,ly+lh-1,3,1,dark);
+  } else if(legType==="horse_hoof"){
+    rect(ctx,lx,ly,Math.round(3*sc),lh-lo,col);
+    rect(ctx,lx-1,ly+lh-lo-1,Math.round(3*sc)+2,2,"#212121"); // hoof
+  } else if(legType==="bird_talon"){
+    rect(ctx,lx+1,ly,2,lh-lo,dark);
+    // Three toes spread
+    px(ctx,lx-1,ly+lh-lo,acc); px(ctx,lx+1,ly+lh-lo+1,acc); px(ctx,lx+3,ly+lh-lo,acc);
+  } else if(legType==="frog_jump"){
+    // Bent frog leg
+    rect(ctx,lx,ly,2,Math.round(lh*0.5),dark);
+    rect(ctx,lx-1,ly+Math.round(lh*0.5),2,Math.round(lh*0.5),dark);
+    rect(ctx,lx-2,ly+lh,4,1,acc); // webbed pad
+  } else if(legType==="kangaroo"){
+    rect(ctx,lx+1,ly,2,Math.round(lh*0.6),dark);
+    rect(ctx,lx,ly+Math.round(lh*0.6),3,Math.round(lh*0.4)+lo,dark);
+    px(ctx,lx-1,ly+lh+lo,acc); // big toe
+  } else if(legType==="elephant_pillar"){
+    rect(ctx,lx-1,ly,4,lh,dark); // thick pillar
+    rect(ctx,lx-2,ly+lh-1,6,2,dark); // pad
+  } else if(legType==="spider_joint"){
+    // Two-segment bent leg
+    for(let i=0;i<Math.round(lh*0.5);i++) px(ctx,lx+flip*(i%2),ly+i,dark);
+    for(let i=0;i<Math.round(lh*0.5);i++) px(ctx,lx+Math.round(lh*0.5)*flip+flip*(-i%2),ly+Math.round(lh*0.5)+i,dark);
+  } else if(legType==="crab_walking"){
+    rect(ctx,lx,ly,lh+2,2,dark); // horizontal
+    px(ctx,lx+lh+1,ly+1,acc); px(ctx,lx-1,ly+1,acc);
+  } else if(legType==="raptor_leg"){
+    // Bent digitigrade — thigh+shin+toe
+    rect(ctx,lx+1,ly,2,Math.round(lh*0.45),dark);
+    rect(ctx,lx,ly+Math.round(lh*0.45),2,Math.round(lh*0.4),dark);
+    px(ctx,lx-1,ly+lh-1,acc); px(ctx,lx+1,ly+lh,acc); px(ctx,lx+2,ly+lh,acc); // killing claw
+  }
+}
+
+function drawCreature(ctx, genome, stage, frame, action, isLifted) {
+  ctx.clearRect(0,0,W*SC,H*SC);
+  const {palette:p,bodyShape,bodySizeMod:bsm,headSizeMod:hsm,headPos:hp,headType,eyeStyle,mouthStyle,earType,snoutType,feetType,patternType,hornType,armL,armR,legL,legR,extraLimbs,tailType,tailSide,tailLen,extras,feature,skin} = genome;
+  const t=frame, sc=STAGE_SC[stage];
+  const isBaby  = stage==="baby";
+  const isTeen  = stage==="teen";
+  const isAdult = stage==="adult";
+  const isElder = stage==="old";
+  const col=p.body, dark=p.dark, light=p.light, acc=p.accent||dark;
+
+  const sleeping=action==="sleep", dead=action==="death";
+  const pickedUp=action==="pickup"||isLifted;
+
+  let bobY=0,walkX=0,shakeX=0,armSwing=0,legSwing=0;
+
+  if(pickedUp){
+    bobY=-4;
+    shakeX=Math.sin(t*0.35)*3; // wiggle
+    armSwing=Math.sin(t*0.35)*3;
+  } else if(sleeping){
+    // Lean and sway — slow breathing sway
+    bobY=Math.round(Math.sin(t*0.4)*2);
+    walkX=Math.sin(t*0.3)*3;
+    armSwing=Math.sin(t*0.4)*2;
+  } else if(action==="idle"){
+    bobY=Math.sin(t*1.5)<0?-1:0;
+    if(isElder){ bobY=0; walkX=Math.sin(t*0.3)*1; armSwing=Math.sin(t*0.4)*1; }
+  } else if(action==="walk"){
+    bobY=Math.abs(Math.sin(t*2.5))>0.5?-1:0;
+    legSwing=Math.sin(t*2.5)*2;
+    walkX=Math.sin(t*0.8)*2;
+    if(isElder){ walkX=Math.sin(t*0.3)*1; bobY=0; legSwing=Math.sin(t*0.3)*1; armSwing=1; }
+  } else if(action==="attack"){
+    shakeX=Math.sin(t*0.28)*2; armSwing=Math.sin(t*0.22)*4;
+  } else if(action==="chop"){
+    // Very slow heavy wind-up, explosive fast drop
+    const chopPhase=(t*1/2.5)%1; // ~100 frame cycle — feels heavy
+    armSwing = chopPhase < 0.75 ? -(chopPhase/0.75)*8 : (1-chopPhase)/0.25*7;
+    bobY = chopPhase > 0.72 && chopPhase < 0.90 ? 2 : 0;
+    shakeX = chopPhase > 0.74 && chopPhase < 0.80 ? Math.sin(t*0.8)*2 : 0;
+  } else if(action==="mine"){
+    // Slow heavy raise, smash down hard
+    const minePhase=(t*1/2.5)%1; // ~100 frames — each swing has weight
+    armSwing = minePhase < 0.6 ? -(minePhase/0.6)*9 : (minePhase-0.6)/0.4*10;
+    bobY = minePhase > 0.85 ? 2 : 0;
+    shakeX = minePhase > 0.88 && minePhase < 0.96 ? Math.sin(t*1.2)*2 : 0;
+  } else if(action==="smith"){
+    // Deliberate hammer raise and pound
+    const smithPhase=(t*1/2.5)%1; // ~83 frames
+    armSwing = smithPhase < 0.55 ? (smithPhase/0.55)*8 : (1-smithPhase)/0.45*(-2);
+    bobY = smithPhase > 0.52 && smithPhase < 0.72 ? 2 : 0;
+    shakeX = smithPhase > 0.54 && smithPhase < 0.62 ? Math.sin(t*1.0)*1 : 0;
+  } else if(action==="build"){
+    // Slow measured nail-drive — wind up, pause, strike
+    const buildPhase=(t*1/3.0)%1; // ~125 frames — slow and deliberate
+    if(buildPhase < 0.5) armSwing = (buildPhase/0.5)*6;
+    else if(buildPhase < 0.55) armSwing = 6; // pause at top
+    else armSwing = (1-buildPhase)/0.45*(-1);
+    bobY = buildPhase > 0.52 && buildPhase < 0.70 ? 1 : 0;
+  } else if(action==="eat"){
+    // Arm raises food to mouth, chomps, lowers — clear cycle
+    const eatPhase=(t*1/4.0)%1;
+    armSwing = eatPhase < 0.3 ? -(eatPhase/0.3)*5 :
+               eatPhase < 0.5 ? -5 + Math.sin(t*4.0)*1 : // at mouth, chewing wobble
+               eatPhase < 0.8 ? -5*(1-(eatPhase-0.5)/0.3) : 0;
+    bobY = eatPhase > 0.3 && eatPhase < 0.7 ? -1 : 0; // lean forward to eat
+  } else if(action==="drink"){
+    // Tip cup up, hold, lower
+    const drinkPhase=(t*1/3.0)%1;
+    armSwing = drinkPhase < 0.25 ? -(drinkPhase/0.25)*6 :
+               drinkPhase < 0.6 ? -6 : // holding up
+               -(1-(drinkPhase-0.6)/0.4)*6;
+    bobY = drinkPhase > 0.2 && drinkPhase < 0.65 ? -1 : 0;
+  } else if(action==="cook"){
+    // Stir motion — slow circles
+    const cookPhase=(t*1/3.0)%1;
+    armSwing = Math.sin(cookPhase*Math.PI*2)*4;
+    walkX = Math.cos(cookPhase*Math.PI*2)*1.5; // body sways with stirring
+    bobY = Math.sin(cookPhase*Math.PI*4)>0 ? -1 : 0;
+  } else if(action==="fish"){
+    // Cast: swing back, pause, forward, then patient wait with line bob
+    const fishPhase=(t*1/2.5)%1;
+    if(fishPhase < 0.15) armSwing = -(fishPhase/0.15)*8; // wind back
+    else if(fishPhase < 0.25) armSwing = -8 + ((fishPhase-0.15)/0.10)*14; // cast forward
+    else armSwing = 6 + Math.sin((fishPhase-0.25)*Math.PI*2*0.5)*1.5; // patient wait bob
+    bobY = fishPhase > 0.1 && fishPhase < 0.3 ? -1 : 0;
+  } else if(action==="carry"){ bobY=-1; armSwing=-3; }
+  else if(action==="pump"){
+    bobY=Math.sin(t*1.0)*1.5>0?1:-1;
+    armSwing=Math.sin(t*1.0)*4;
+  } else if(action==="gather"){
+    // Bend down to pick up: whole body dips, arm reaches down to ground then up
+    const gatherPhase=(t*1/3.0)%1;
+    armSwing = gatherPhase < 0.4 ? (gatherPhase/0.4)*7  // reach down
+             : gatherPhase < 0.6 ? 7                     // grab
+             : 7*(1-(gatherPhase-0.6)/0.4);              // stand back up
+    bobY = gatherPhase < 0.5 ? Math.round(gatherPhase/0.5*4) : // whole body bends down
+           Math.round((1-(gatherPhase-0.5)/0.5)*4);      // stand back up
+    legSwing = Math.sin(gatherPhase*Math.PI)*1;
+  } else if(action==="hunt"){
+    armSwing=Math.sin(t*3.0)*3; legSwing=Math.sin(t*3.0);
+  } else if(action==="poop"){
+    // Squeeze phase then drop
+    const poopPhase=(t*1/5.0)%1;
+    shakeX = poopPhase < 0.5 ? Math.sin(t*8.0)*1 : 0; // squeezing wiggle
+    bobY = poopPhase < 0.5 ? 1 : 0; // squat
+    armSwing = poopPhase < 0.5 ? Math.sin(t*8.0)*2 : 0; // arms flail while squeezing
+  } else if(action==="dance"){
+    // BIG visible dance — bounce, sway, arms wave
+    const dancePhase=(t*1/2.0)%1;
+    bobY = Math.round(Math.abs(Math.sin(dancePhase*Math.PI*4))*-3); // bounce up
+    walkX = Math.sin(dancePhase*Math.PI*2)*4; // sway side to side
+    armSwing = Math.sin(dancePhase*Math.PI*4)*6; // wild arm waving
+    legSwing = Math.sin(dancePhase*Math.PI*4)*3; // legs kick
+    shakeX = Math.cos(dancePhase*Math.PI*3)*1;
+  }
+  if(dead){ bobY=0; walkX=0; shakeX=0; armSwing=0; legSwing=0; } // death = no movement
+
+  const BDIMS={
+    round:      {bx:15,by:25,bw:15,bh:12},
+    blob:       {bx:13,by:24,bw:19,bh:15},
+    wide:       {bx:9, by:27,bw:27,bh:8 },
+    tall:       {bx:17,by:19,bw:11,bh:20},
+    sausage:    {bx:16,by:18,bw:12,bh:22},
+    chunky:     {bx:13,by:23,bw:20,bh:16},
+    tiny:       {bx:18,by:30,bw:9, bh:7 },
+    pear:       {bx:15,by:24,bw:15,bh:16},
+    diamond:    {bx:16,by:23,bw:13,bh:14},
+    barrel:     {bx:13,by:22,bw:19,bh:17},
+    lumpy:      {bx:12,by:23,bw:21,bh:14},
+    egg:        {bx:16,by:22,bw:13,bh:18},
+    melting:    {bx:12,by:23,bw:21,bh:13},
+    sac:        {bx:14,by:23,bw:17,bh:17},
+    // Animal silhouettes
+    bear_body:  {bx:12,by:22,bw:21,bh:17},
+    wolf_body:  {bx:14,by:23,bw:17,bh:14},
+    cat_body:   {bx:15,by:24,bw:14,bh:13},
+    horse_body: {bx:11,by:23,bw:23,bh:15},
+    frog_body:  {bx:12,by:26,bw:21,bh:10},
+    bird_body:  {bx:15,by:24,bw:15,bh:13},
+    crab_body:  {bx:11,by:27,bw:23,bh:8 },
+    snake_body: {bx:15,by:20,bw:10,bh:22},
+    gorilla_body:{bx:12,by:22,bw:21,bh:17},
+    rhino_body: {bx:10,by:24,bw:25,bh:13},
+    // Liquid / ooze / biological
+    ooze:       {bx:11,by:24,bw:23,bh:14},
+    dripping:   {bx:13,by:22,bw:19,bh:18},
+    puddle:     {bx:9, by:28,bw:27,bh:7 },
+    bubble:     {bx:14,by:23,bw:16,bh:16},
+    amorphous:  {bx:11,by:22,bw:23,bh:16},
+    crystal_body:{bx:15,by:22,bw:14,bh:17},
+    void_body:  {bx:14,by:23,bw:16,bh:15},
+  };
+  const bd=BDIMS[bodyShape]||BDIMS.round;
+  const cx=W/2;
+  const bsm2=(bsm||1)*sc;
+  const bxr=Math.round(cx+(bd.bx-cx)*bsm2), byr=Math.round(24+(bd.by-24)*bsm2);
+  const bw=Math.max(5,Math.round(bd.bw*bsm2)), bh=Math.max(4,Math.round(bd.bh*bsm2));
+  const bx=Math.round(bxr+walkX+shakeX), by=Math.round(byr+bobY);
+
+  // ── TAIL ─────────────────────────────────────────────────────────────────
+  // ── STAGE FEATURE GATES ──────────────────────────────────────────────────
+  // What each stage gets:
+  // baby:  body + head + simple eyes + maybe tail. NO extras, horns, snout, pattern, feet, extra limbs
+  // teen:  + ears + feet + tail. Still no horns, snout, pattern, extras, extra limbs
+  // adult: everything
+  // elder: everything but squashed/hunched + grey overlay + wrinkles
+
+  drawTail(ctx, genome, bx, by, bw, bh, sc, frame, action, p);
+
+  // ── SHADOW ───────────────────────────────────────────────────────────────
+  if(!pickedUp){
+    ctx.fillStyle="rgba(0,0,0,0.22)";
+    ctx.fillRect((bx+2)*SC,(by+bh+1)*SC,(bw-4)*SC,SC);
+  }
+
+  // ── LEGS ─────────────────────────────────────────────────────────────────
+  drawLeg(ctx, legL, "L", bx, by, bw, bh, sc, frame, Math.round(legSwing), p);
+  drawLeg(ctx, legR, "R", bx, by, bw, bh, sc, frame, Math.round(legSwing), p);
+
+  // ── ARMS (behind body) ───────────────────────────────────────────────────
+  drawArm(ctx, armL, "L", bx, by, bw, bh, sc, frame, Math.round(armSwing), p);
+  drawArm(ctx, armR, "R", bx, by, bw, bh, sc, frame, Math.round(armSwing), p);
+
+  // Extra limbs — distributed around body
+  // extra limbs — adult/elder only
+  if(isAdult||isElder) extraLimbs.forEach((el, i)=>{
+    const side = i%2===0?"L":"R";
+    const yOff = Math.round(bh*0.5);
+    const tempBx = bx, tempBy = by+yOff;
+    drawArm(ctx, el, side, tempBx, tempBy, bw, bh-yOff, sc, frame, Math.round(armSwing*0.7), p);
+  });
+
+  // ── BODY — organic per-shape rendering ───────────────────────────────────
+  // Each shape draws differently instead of just rect()
+  if(bodyShape==="round"||bodyShape==="blob"){
+    // Rounded corners — mask out 1px at each corner
+    rect(ctx,bx,by,bw,bh,col);
+    px(ctx,bx,by,"transparent"); px(ctx,bx+bw-1,by,"transparent");
+    px(ctx,bx,by+bh-1,"transparent"); px(ctx,bx+bw-1,by+bh-1,"transparent");
+    // Re-draw corners as bg to fake rounding
+    ctx.clearRect(bx*SC,by*SC,SC,SC);
+    ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+bh-1)*SC,SC,SC);
+    ctx.clearRect((bx+bw-1)*SC,(by+bh-1)*SC,SC,SC);
+  } else if(bodyShape==="pear"){
+    // Wide bottom, narrow top
+    for(let j=0;j<bh;j++){
+      const taper=Math.round((j/bh)*3);
+      rect(ctx,bx+taper,by+j,bw-taper*2,1,col);
+    }
+  } else if(bodyShape==="egg"){
+    // Oval — taper top and bottom
+    for(let j=0;j<bh;j++){
+      const mid=bh/2, dist=Math.abs(j-mid)/mid;
+      const taper=Math.round(dist*dist*3);
+      rect(ctx,bx+taper,by+j,Math.max(2,bw-taper*2),1,col);
+    }
+  } else if(bodyShape==="diamond"){
+    // Diamond — taper from center out
+    for(let j=0;j<bh;j++){
+      const mid=bh/2, dist=Math.abs(j-mid)/mid;
+      const taper=Math.round(dist*(bw/2-1));
+      rect(ctx,bx+taper,by+j,Math.max(1,bw-taper*2),1,col);
+    }
+  } else if(bodyShape==="triangular"){
+    // Wide base, point top
+    for(let j=0;j<bh;j++){
+      const taper=Math.round((1-j/bh)*(bw/3));
+      rect(ctx,bx+taper,by+j,Math.max(2,bw-taper*2),1,col);
+    }
+  } else if(bodyShape==="sausage"){
+    // Capsule: rounded top and bottom, full width middle
+    for(let j=0;j<bh;j++){
+      let taper=0;
+      if(j<2) taper=2-j;
+      else if(j>bh-3) taper=j-(bh-3);
+      rect(ctx,bx+taper,by+j,Math.max(2,bw-taper*2),1,col);
+    }
+  } else if(bodyShape==="melting"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Drips hang below
+    for(let i=1;i<bw-1;i+=2){
+      const d=1+Math.round(Math.abs(Math.sin(i*1.3))*3);
+      rect(ctx,bx+i,by+bh,1,d,acc);
+    }
+  } else if(bodyShape==="lumpy"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Random bumps on surface
+    for(let i=2;i<bw-2;i+=3) rect(ctx,bx+i,by-1,2,1,col);
+    for(let i=1;i<bw-1;i+=5) rect(ctx,bx+i,by+bh,2,1,col);
+  } else if(bodyShape==="flat"){
+    // Extra wide, very short — pancake
+    rect(ctx,bx,by,bw,bh,col);
+    // Rounded ends
+    ctx.clearRect(bx*SC,by*SC,SC,SC);
+    ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+bh-1)*SC,SC,SC);
+    ctx.clearRect((bx+bw-1)*SC,(by+bh-1)*SC,SC,SC);
+  } else if(bodyShape==="starfish"){
+    // Cross-ish with arm nubs
+    const mx=bx+Math.round(bw/2), my=by+Math.round(bh/2);
+    rect(ctx,bx,my-1,bw,3,col); // horizontal bar
+    rect(ctx,mx-1,by,3,bh,col); // vertical bar
+    // Diagonal nubs
+    px(ctx,mx-2,my-2,col); px(ctx,mx+2,my-2,col);
+    px(ctx,mx-2,my+2,col); px(ctx,mx+2,my+2,col);
+  } else if(bodyShape==="segmented"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Segment dividers
+    for(let j=Math.round(bh/3);j<bh;j+=Math.round(bh/3)){
+      rect(ctx,bx+1,by+j,bw-2,1,dark);
+    }
+  } else if(bodyShape==="plated"){
+    rect(ctx,bx,by,bw,bh,col);
+    for(let i=0;i<bw;i+=3) for(let j=0;j<bh;j+=3) rect(ctx,bx+i,by+j,2,2,i%6===0?dark:col);
+  } else if(bodyShape==="stitched"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Stitched seam down middle
+    for(let j=1;j<bh-1;j+=3) px(ctx,bx+Math.round(bw/2),by+j,dark);
+    for(let j=2;j<bh-1;j+=3) px(ctx,bx+Math.round(bw/2),by+j,acc);
+  } else if(bodyShape==="sac"){
+    // Pulsing translucent blob
+    rect(ctx,bx,by,bw,bh,col);
+    const pulse=Math.round(Math.sin(t*4.8)*1);
+    ctx.globalAlpha=0.25;
+    rect(ctx,bx-pulse,by-pulse,bw+pulse*2,bh+pulse*2,light);
+    ctx.globalAlpha=1;
+  } else if(bodyShape==="barrel"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Barrel staves
+    for(let i=2;i<bw-2;i+=4) rect(ctx,bx+i,by+1,1,bh-2,dark);
+    // Hoops
+    rect(ctx,bx,by+Math.round(bh*0.3),bw,1,dark);
+    rect(ctx,bx,by+Math.round(bh*0.7),bw,1,dark);
+  } else if(bodyShape==="tiny"){
+    // Small round body
+    rect(ctx,bx+1,by,bw-2,bh,col);
+    rect(ctx,bx,by+1,bw,bh-2,col);
+  } else if(bodyShape==="wide"){
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-1,by+1,1,bh-2,col); rect(ctx,bx+bw,by+1,1,bh-2,col);
+  } else if(bodyShape==="tall"){
+    rect(ctx,bx,by,bw,bh,col);
+    ctx.clearRect(bx*SC,by*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+  } else if(bodyShape==="chunky"){
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-1,by+Math.round(bh*0.35),1,Math.round(bh*0.3),col);
+    rect(ctx,bx+bw,by+Math.round(bh*0.35),1,Math.round(bh*0.3),col);
+
+  // ── ANIMAL BODY SILHOUETTES ─────────────────────────────────────────────
+  } else if(bodyShape==="bear_body"){
+    // Big round body, wider at shoulders
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-1,by,1,Math.round(bh*0.6),col); rect(ctx,bx+bw,by,1,Math.round(bh*0.6),col);
+    ctx.clearRect(bx*SC,(by+bh-1)*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,(by+bh-1)*SC,SC,SC);
+  } else if(bodyShape==="wolf_body"){
+    // Deep chest, tucked belly
+    for(let j=0;j<bh;j++){
+      const chest=j<Math.round(bh*0.45);
+      const w=chest?bw:Math.max(4,bw-Math.round((j-bh*0.45)*0.7));
+      const x=bx+Math.round((bw-w)/2);
+      rect(ctx,x,by+j,w,1,col);
+    }
+  } else if(bodyShape==="cat_body"){
+    // Lithe — narrow waist
+    for(let j=0;j<bh;j++){
+      const waist=Math.abs(j-bh*0.5)/(bh*0.5);
+      const w=Math.max(4,bw-Math.round((1-waist*waist)*3));
+      rect(ctx,bx+Math.round((bw-w)/2),by+j,w,1,col);
+    }
+  } else if(bodyShape==="horse_body"){
+    // Long barrel chest
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx+1,by-1,bw-2,1,col); // withers hump
+    ctx.clearRect(bx*SC,by*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+bh-1)*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,(by+bh-1)*SC,SC,SC);
+  } else if(bodyShape==="frog_body"){
+    // Wide flat body, widest in middle
+    for(let j=0;j<bh;j++){
+      const belly=j>Math.round(bh*0.3)&&j<Math.round(bh*0.8);
+      const w=belly?bw+2:bw;
+      rect(ctx,bx-1+Math.round((bw+2-w)/2),by+j,w,1,col);
+    }
+  } else if(bodyShape==="bird_body"){
+    // Round front, tapered back like a bird
+    for(let j=0;j<bh;j++){
+      const front=j<Math.round(bh*0.5);
+      const w=front?bw-Math.round((j/bh)*2):bw-Math.round(((j-bh*0.5)/(bh*0.5))*bw*0.5);
+      rect(ctx,bx+Math.round((bw-w)/2),by+j,Math.max(2,w),1,col);
+    }
+  } else if(bodyShape==="crab_body"){
+    // Wide flat carapace, rounded sides
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-1,by+1,1,bh-2,col); rect(ctx,bx+bw,by+1,1,bh-2,col);
+    for(let i=0;i<bw;i+=3) px(ctx,bx+i,by,dark); // carapace lines
+    px(ctx,bx,by,""); ctx.clearRect(bx*SC,by*SC,SC,SC);
+    ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+  } else if(bodyShape==="snake_body"){
+    // Long thin with slight S-curve
+    for(let j=0;j<bh;j++){
+      const sway=Math.round(Math.sin(j*0.35+t*0.7)*2);
+      rect(ctx,bx+sway+1,by+j,bw-2,1,col);
+    }
+  } else if(bodyShape==="gorilla_body"){
+    // Massive shoulders, barrel chest
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-2,by,2,Math.round(bh*0.45),col); // L shoulder bulk
+    rect(ctx,bx+bw,by,2,Math.round(bh*0.45),col); // R shoulder bulk
+    rect(ctx,bx+2,by,bw-4,1,light); // shoulder ridge
+  } else if(bodyShape==="rhino_body"){
+    // Massive square body
+    rect(ctx,bx,by,bw,bh,col);
+    rect(ctx,bx-1,by,1,bh,col); rect(ctx,bx+bw,by,1,bh,col); // armored sides
+    for(let i=0;i<bw;i+=4) rect(ctx,bx+i,by,2,1,dark); // armor plating top
+
+  // ── OOZE / LIQUID / BIOLOGICAL ──────────────────────────────────────────
+  } else if(bodyShape==="ooze"){
+    // Spreads at bottom — drips and pools
+    for(let j=0;j<bh;j++){
+      const spread=Math.round((j/bh)*4);
+      rect(ctx,bx-spread,by+j,bw+spread*2,1,col);
+    }
+    // Drip blobs at bottom
+    for(let i=2;i<bw+2;i+=4){
+      const dripLen=1+Math.round(Math.abs(Math.sin(i*1.1+t*1.0))*3);
+      rect(ctx,bx-2+i,by+bh,1,dripLen,acc||col);
+    }
+  } else if(bodyShape==="dripping"){
+    rect(ctx,bx,by,bw,bh,col);
+    // Irregular dripping bottom edge
+    for(let i=0;i<bw;i+=2){
+      const dripLen=1+Math.round(Math.abs(Math.sin(i*0.9+t*0.8))*4);
+      rect(ctx,bx+i,by+bh,1,dripLen,col);
+      if(Math.sin(i*1.3)>0.5) px(ctx,bx+i,by+bh+dripLen,dark);
+    }
+  } else if(bodyShape==="puddle"){
+    // Flat spreading puddle — widest at the very bottom
+    for(let j=0;j<bh;j++){
+      const pct=j/bh;
+      const w=Math.round(bw*0.3+bw*0.7*(pct*pct));
+      rect(ctx,bx+Math.round((bw-w)/2),by+j,w,1,col);
+    }
+    // Ripple rings
+    const ripple=Math.round(Math.sin(t*4.8)*1);
+    ctx.globalAlpha=0.3;
+    rect(ctx,bx-1+ripple,by+bh-1,bw+2-ripple*2,1,light);
+    ctx.globalAlpha=1;
+  } else if(bodyShape==="bubble"){
+    // Perfectly round with inner highlight — like a soap bubble
+    rect(ctx,bx,by,bw,bh,col);
+    ctx.clearRect(bx*SC,by*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,by*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+bh-1)*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,(by+bh-1)*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+1)*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,(by+1)*SC,SC,SC);
+    ctx.clearRect(bx*SC,(by+bh-2)*SC,SC,SC); ctx.clearRect((bx+bw-1)*SC,(by+bh-2)*SC,SC,SC);
+    // Translucent inner
+    ctx.globalAlpha=0.2; rect(ctx,bx+1,by+1,bw-2,bh-2,light); ctx.globalAlpha=1;
+    px(ctx,bx+2,by+2,light); px(ctx,bx+3,by+1,light); // bubble highlight
+  } else if(bodyShape==="amorphous"){
+    // Irregular blob — shifts slightly with time
+    for(let j=0;j<bh;j++){
+      const wobble=Math.round(Math.sin(j*0.6+t*2.4)*2);
+      const w=bw-2+wobble;
+      rect(ctx,bx+1-Math.round(wobble/2),by+j,Math.max(3,w),1,col);
+    }
+  } else if(bodyShape==="crystal_body"){
+    // Faceted angular shape
+    for(let j=0;j<bh;j++){
+      const facet=j<Math.round(bh*0.4)?j:j>Math.round(bh*0.6)?bh-j:Math.round(bh*0.4);
+      const tap=Math.round(facet*0.4);
+      rect(ctx,bx+tap,by+j,Math.max(2,bw-tap*2),1,j%3===0?light:col);
+    }
+    px(ctx,bx+Math.round(bw*0.3),by,light); px(ctx,bx+Math.round(bw*0.7),by+1,light);
+  } else if(bodyShape==="void_body"){
+    // Dark void with glowing edge
+    rect(ctx,bx,by,bw,bh,"#000");
+    // Glowing border
+    for(let i=0;i<bw;i++){ px(ctx,bx+i,by,acc); px(ctx,bx+i,by+bh-1,acc); }
+    for(let j=0;j<bh;j++){ px(ctx,bx,by+j,acc); px(ctx,bx+bw-1,by+j,acc); }
+    ctx.globalAlpha=0.3+Math.sin(t*1.5)*0.2;
+    rect(ctx,bx+1,by+1,bw-2,bh-2,p.accent||dark); ctx.globalAlpha=1;
+
+  } else {
+    rect(ctx,bx,by,bw,bh,col);
+  }
+
+  // Shading
+  rect(ctx,bx+1,by+1,bw-2,1,light);
+  rect(ctx,bx,by+bh-Math.max(1,Math.round(2*sc)),bw,Math.max(1,Math.round(2*sc)),dark);
+  if(p.accent&&bh>5) rect(ctx,bx+1,by+Math.round(bh*0.45),bw-2,Math.max(1,Math.round(bh*0.15)),p.accent);
+
+  // Features — gated by stage
+  if((isAdult||isElder) && feature==="spots"){ for(let i=0;i<3;i++) for(let j=0;j<2;j++) px(ctx,bx+2+i*5,by+2+j*4,dark); }
+  else if(feature==="stripes"){ for(let i=0;i<bh;i+=3) rect(ctx,bx+1,by+i,bw-2,1,dark); }
+  else if(feature==="spikes"){ for(let i=2;i<bw-2;i+=3) px(ctx,bx+i,by-1,dark); }
+  else if(feature==="scales"){ for(let i=0;i<bw-2;i+=2) for(let j=0;j<bh-2;j+=2) if((i+j)%4===0) px(ctx,bx+1+i,by+1+j,acc); }
+  else if(feature==="cracks"){ px(ctx,bx+3,by+2,dark); px(ctx,bx+4,by+3,dark); px(ctx,bx+3,by+4,dark); }
+  else if(feature==="crystals"){ px(ctx,bx+bw-3,by,light); px(ctx,bx+bw-4,by+1,light); px(ctx,bx+bw-2,by+1,light); }
+  else if(feature==="mossy"){ for(let i=0;i<bw;i+=3) px(ctx,bx+i,by,acc); }
+  else if(feature==="veins"){ for(let i=2;i<bh-2;i+=4) px(ctx,bx+Math.round(bw/2),by+i,acc); }
+  else if(feature==="fur_patches"){ for(let i=0;i<bw;i+=4) px(ctx,bx+i,by-1,light); }
+  else if(feature==="circuit"){ for(let i=2;i<bw-2;i+=4){ rect(ctx,bx+i,by+2,1,bh-4,"#ffeb3b"); if(i%8===0) px(ctx,bx+i-1,by+4,"#ffeb3b"); } }
+  else if(feature==="stitches"){ for(let i=2;i<bw-2;i+=3) px(ctx,bx+i,by+Math.round(bh/2),dark); }
+  else if(feature==="barnacles"){ for(let i=1;i<bw-1;i+=3) for(let j=2;j<bh-2;j+=4) { rect(ctx,bx+i,by+j,2,2,dark); px(ctx,bx+i+1,by+j,light); } }
+  else if(feature==="slime_drip"){ for(let i=0;i<bw;i+=4){ const d=rndInt(1,3); rect(ctx,bx+i,by+bh,1,d,acc); } }
+  else if(feature==="plates"){ for(let j=0;j<bh;j+=4){ rect(ctx,bx,by+j,bw,2,j%8===0?dark:col); } }
+  else if(feature==="fur_full"){ for(let i=0;i<bw;i+=2) for(let j=0;j<bh;j+=3) if((i+j)%5!==0) px(ctx,bx+i,by+j,light); }
+  // Skin — baby none, teen simple only
+  if(!isBaby && skin==="bumpy"){ for(let i=2;i<bw-2;i+=3) for(let j=2;j<bh-2;j+=4) px(ctx,bx+i,by+j,light); }
+  else if(skin==="shiny"){ px(ctx,bx+2,by+2,light); px(ctx,bx+3,by+1,light); }
+  else if(skin==="wet"){ px(ctx,bx+1,by+3,"rgba(255,255,255,0.5)"); px(ctx,bx+bw-2,by+5,"rgba(255,255,255,0.4)"); }
+  else if(skin==="rusted"){ for(let i=0;i<bw;i+=4) px(ctx,bx+i,by+Math.round(bh/2),"#bf360c"); }
+  else if(skin==="chitinous"){ for(let i=1;i<bh-1;i+=3) rect(ctx,bx,by+i,bw,1,i%6===0?dark:col); }
+  else if(skin==="translucent"){ ctx.globalAlpha=0.7; rect(ctx,bx+1,by+1,bw-2,bh-2,light); ctx.globalAlpha=1; }
+  else if(skin==="patchwork"){
+    rect(ctx,bx,by,Math.round(bw/2),Math.round(bh/2),acc);
+    rect(ctx,bx+Math.round(bw/2),by+Math.round(bh/2),Math.round(bw/2),Math.round(bh/2),light);
+  }
+
+  // ── HEAD ─────────────────────────────────────────────────────────────────
+  const HD={
+    round:{hx:15,hy:13,hw:14,hh:11},square:{hx:14,hy:12,hw:16,hh:12},
+    oval:{hx:16,hy:13,hw:12,hh:13},horned:{hx:15,hy:13,hw:14,hh:11},
+    eared:{hx:15,hy:13,hw:14,hh:11},finned:{hx:15,hy:13,hw:14,hh:11},
+    trex:{hx:13,hy:12,hw:18,hh:11},raptor:{hx:14,hy:12,hw:16,hh:10},
+    croc:{hx:12,hy:14,hw:20,hh:8},triceratops:{hx:13,hy:12,hw:18,hh:12},
+    ankylosaurus:{hx:13,hy:13,hw:18,hh:10},frog:{hx:13,hy:12,hw:18,hh:10},
+    snail:{hx:15,hy:13,hw:14,hh:10},jellyfish:{hx:14,hy:11,hw:16,hh:13},
+    mushroom:{hx:13,hy:10,hw:18,hh:14},hammerhead:{hx:11,hy:13,hw:22,hh:9},
+    axolotl:{hx:14,hy:12,hw:16,hh:11},blobfish:{hx:13,hy:12,hw:18,hh:13},
+    tardigrade:{hx:14,hy:12,hw:16,hh:12},mantis:{hx:16,hy:11,hw:12,hh:14},
+    elongated:{hx:16,hy:10,hw:12,hh:16},donut:{hx:14,hy:12,hw:16,hh:12},
+    two_headed:{hx:13,hy:12,hw:18,hh:11},cactus:{hx:15,hy:12,hw:14,hh:13},
+    // Animal heads
+    dog:{hx:14,hy:12,hw:15,hh:12},cat:{hx:15,hy:12,hw:13,hh:11},
+    bear:{hx:14,hy:12,hw:16,hh:13},rabbit:{hx:15,hy:13,hw:14,hh:11},
+    horse:{hx:14,hy:11,hw:15,hh:14},pig:{hx:14,hy:13,hw:16,hh:11},
+    bull:{hx:13,hy:12,hw:17,hh:12},wolf:{hx:14,hy:12,hw:15,hh:12},
+    deer:{hx:15,hy:12,hw:14,hh:12},lion:{hx:13,hy:11,hw:18,hh:14},
+    shark:{hx:12,hy:13,hw:20,hh:10},eagle:{hx:14,hy:12,hw:16,hh:12},
+    owl:{hx:14,hy:11,hw:16,hh:14},parrot:{hx:15,hy:12,hw:14,hh:12},
+    snake:{hx:13,hy:13,hw:18,hh:9},gorilla:{hx:13,hy:12,hw:18,hh:13},
+    elephant:{hx:13,hy:11,hw:18,hh:14},rhino:{hx:12,hy:12,hw:20,hh:12},
+    hippo:{hx:12,hy:13,hw:20,hh:11},bat:{hx:14,hy:12,hw:16,hh:12},
+    fox:{hx:14,hy:12,hw:15,hh:12},raccoon:{hx:14,hy:12,hw:16,hh:12},
+    panda:{hx:13,hy:11,hw:18,hh:14},
+  };
+  const hd=HD[headType]||HD.round;
+  // Baby has huge head, elder is hunched (smaller headPos offset + body squash)
+  const babyHeadBoost = isBaby ? 1.35 : isTeen ? 1.1 : 1.0;
+  const elderHunch = isElder ? 3 : 0; // pixels elder head drops toward body
+  const hsm2=(hsm||1)*sc*babyHeadBoost;
+  const hxr=Math.round(cx+(hd.hx-cx)*hsm2);
+  // headPos shifts head vertically relative to body top
+  const headPosOffset = hp==="high" ? -2 : hp==="low" ? 3 : hp==="floating" ? -4 : 0;
+  const hyr=Math.round(by - Math.round(hd.hh*hsm2) - 1 + headPosOffset + elderHunch);
+  const hw=Math.max(5,Math.round(hd.hw*hsm2)), hh=Math.max(4,Math.round(hd.hh*hsm2));
+  const hx=Math.round(hxr+walkX+shakeX), hy=Math.round(hyr+bobY);
+
+  // Head type extras
+  if(headType==="horned"||headType==="triceratops"){
+    px(ctx,hx+2,hy-2,dark); px(ctx,hx+hw-3,hy-2,dark); px(ctx,hx+2,hy-1,dark); px(ctx,hx+hw-3,hy-1,dark);
+    if(headType==="triceratops") rect(ctx,hx,hy-3,hw,3,acc);
+  } else if(headType==="eared"||headType==="axolotl"){
+    rect(ctx,hx-2,hy-1,2,Math.round(4*sc),dark); rect(ctx,hx+hw,hy-1,2,Math.round(4*sc),dark);
+    if(headType==="axolotl"){ px(ctx,hx-1,hy-2,acc); px(ctx,hx+hw,hy-2,acc); }
+  } else if(headType==="finned"){
+    for(let i=0;i<5;i++) px(ctx,hx+2+i,hy-1-i,acc);
+  } else if(headType==="croc"){
+    rect(ctx,hx+2,hy-2,hw-4,3,dark); for(let i=2;i<hw-2;i+=3) px(ctx,hx+i,hy-2,acc);
+  } else if(headType==="frog"){
+    rect(ctx,hx+1,hy-2,Math.round(3*sc),Math.round(2*sc),col); rect(ctx,hx+hw-Math.round(4*sc),hy-2,Math.round(3*sc),Math.round(2*sc),col);
+  } else if(headType==="snail"){
+    rect(ctx,hx+hw-2,hy-5,4,6,acc); rect(ctx,hx+hw,hy-5,2,2,light);
+  } else if(headType==="jellyfish"){
+    for(let i=0;i<hw;i+=3) px(ctx,hx+i,hy+hh,acc);
+    for(let i=0;i<hw;i+=2){ const d=Math.round(Math.sin(t*0.1+i)*2); px(ctx,hx+i,hy+hh+1+d,dark); }
+  } else if(headType==="mushroom"){
+    rect(ctx,hx-1,hy,hw+2,Math.round(hh*0.5),acc); rect(ctx,hx+1,hy+1,hw-2,Math.round(hh*0.3),light);
+    for(let i=1;i<hw-1;i+=3) px(ctx,hx+i,hy+1,col);
+  } else if(headType==="hammerhead"){
+    rect(ctx,hx,hy,hw,2,dark);
+  } else if(headType==="mantis"){
+    rect(ctx,hx+Math.round(hw/2)-1,hy-4,3,4,dark);
+    px(ctx,hx+Math.round(hw/2)-2,hy-5,acc); px(ctx,hx+Math.round(hw/2)+2,hy-5,acc);
+  } else if(headType==="two_headed"){
+    rect(ctx,hx+1,hy-5,Math.round(5*sc),Math.round(4*sc),col);
+    rect(ctx,hx+2,hy-4,Math.round(5*sc)-2,1,light);
+  } else if(headType==="ankylosaurus"){
+    for(let i=0;i<hw;i+=3) px(ctx,hx+i,hy,dark);
+    for(let i=1;i<hw-1;i+=2) px(ctx,hx+i,hy+1,acc);
+  } else if(headType==="donut"){
+    rect(ctx,hx+Math.round(hw*0.3),hy+Math.round(hh*0.3),Math.round(hw*0.4),Math.round(hh*0.4),"#080808");
+  } else if(headType==="cactus"){
+    px(ctx,hx+2,hy-2,acc); px(ctx,hx+hw-3,hy-2,acc); px(ctx,hx,hy+2,acc); px(ctx,hx+hw-1,hy+2,acc);
+  } else if(headType==="blobfish"){
+    rect(ctx,hx+Math.round(hw/2)-1,hy+Math.round(hh*0.6),3,Math.round(hh*0.4)+1,col);
+  } else if(headType==="tardigrade"){
+    for(let i=0;i<4;i++) rect(ctx,hx+1+i*Math.round(hw*0.22),hy+hh,2,2,dark);
+  // ── ANIMAL HEADS ────────────────────────────────────────────────────────
+  } else if(headType==="dog"){
+    // Snout bump
+    rect(ctx,hx+Math.round(hw*0.15),hy+Math.round(hh*0.45),Math.round(hw*0.7),Math.round(hh*0.5),col);
+    px(ctx,hx+Math.round(hw/2)-1,hy+Math.round(hh*0.4),dark); px(ctx,hx+Math.round(hw/2)+1,hy+Math.round(hh*0.4),dark);
+  } else if(headType==="cat"){
+    // Pointed muzzle indent, round cheeks
+    rect(ctx,hx-1,hy+Math.round(hh*0.3),2,Math.round(hh*0.5),col);
+    rect(ctx,hx+hw-1,hy+Math.round(hh*0.3),2,Math.round(hh*0.5),col);
+  } else if(headType==="bear"){
+    // Wide round, broad snout
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.45),Math.round(hw*0.6),Math.round(hh*0.45),dark);
+    rect(ctx,hx+Math.round(hw*0.25),hy+Math.round(hh*0.5),Math.round(hw*0.5),Math.round(hh*0.35),col);
+  } else if(headType==="horse"){
+    // Long face — taller head, narrow
+    rect(ctx,hx+Math.round(hw*0.1),hy+Math.round(hh*0.3),Math.round(hw*0.8),Math.round(hh*0.65),col);
+    rect(ctx,hx+Math.round(hw*0.15),hy+Math.round(hh*0.35),Math.round(hw*0.7),Math.round(hh*0.55),dark);
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.4),Math.round(hw*0.6),Math.round(hh*0.45),col);
+  } else if(headType==="pig"){
+    // Flat round, pushed nose
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.5),Math.round(hw*0.6),Math.round(hh*0.4),col);
+    px(ctx,hx+Math.round(hw*0.35),hy+Math.round(hh*0.6),dark); px(ctx,hx+Math.round(hw*0.6),hy+Math.round(hh*0.6),dark);
+  } else if(headType==="bull"){
+    // Wide blocky jaw
+    rect(ctx,hx+1,hy+Math.round(hh*0.5),hw-2,Math.round(hh*0.45),dark);
+    rect(ctx,hx+2,hy+Math.round(hh*0.55),hw-4,Math.round(hh*0.35),col);
+    // Nose ring
+    rect(ctx,hx+Math.round(hw/2)-1,hy+hh-2,3,2,"#90a4ae");
+  } else if(headType==="wolf"){
+    // Long muzzle
+    rect(ctx,hx+Math.round(hw*0.1),hy+Math.round(hh*0.4),Math.round(hw*0.8),Math.round(hh*0.55),col);
+    rect(ctx,hx+Math.round(hw*0.15),hy+Math.round(hh*0.45),Math.round(hw*0.7),Math.round(hh*0.45),dark);
+  } else if(headType==="deer"){
+    // Delicate narrow face
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.35),Math.round(hw*0.6),Math.round(hh*0.6),col);
+  } else if(headType==="lion"){
+    // Mane — wide circle around head
+    for(let i=0;i<hw+4;i+=2){ px(ctx,hx-2+i,hy-2,acc); px(ctx,hx-2+i,hy+hh+1,acc); }
+    for(let j=0;j<hh+4;j+=2){ px(ctx,hx-2,hy-2+j,acc); px(ctx,hx+hw+1,hy-2+j,acc); }
+  } else if(headType==="shark"){
+    // Streamlined, bottom jaw
+    rect(ctx,hx+1,hy+Math.round(hh*0.55),hw-2,Math.round(hh*0.4),dark);
+    rect(ctx,hx+2,hy+Math.round(hh*0.6),hw-4,Math.round(hh*0.3),col);
+    // Top fin
+    for(let i=0;i<4;i++) px(ctx,hx+Math.round(hw/2)+i,hy-1-i,dark);
+  } else if(headType==="eagle"){
+    // Fierce brow, curved beak
+    rect(ctx,hx+1,hy+1,hw-2,1,dark); // brow ridge
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.5),Math.round(hw*0.5),2,"#ef6c00"); // upper beak
+    for(let i=0;i<3;i++) px(ctx,hx+Math.round(hw*0.65)+i,hy+Math.round(hh*0.5)+i,"#e65100"); // curve
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.6),Math.round(hw*0.4),1,"#ef6c00"); // lower beak
+  } else if(headType==="owl"){
+    // Flat face disc, tufts
+    rect(ctx,hx-1,hy,hw+2,hh,col); // face disc wider
+    px(ctx,hx+1,hy-1,dark); px(ctx,hx+2,hy-2,dark); // left tuft
+    px(ctx,hx+hw-2,hy-1,dark); px(ctx,hx+hw-3,hy-2,dark); // right tuft
+    // Small beak center
+    rect(ctx,hx+Math.round(hw/2)-1,hy+Math.round(hh*0.5),3,2,"#ef6c00");
+  } else if(headType==="parrot"){
+    // Curved hooked beak
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.4),Math.round(hw*0.5),2,"#ef6c00");
+    for(let i=0;i<3;i++) px(ctx,hx+Math.round(hw*0.65)+i,hy+Math.round(hh*0.4)+i,"#e65100");
+    // Cheek patch
+    px(ctx,hx+2,hy+Math.round(hh*0.5),light);
+  } else if(headType==="snake"){
+    // Flat triangular — wide at back, pointed at front
+    for(let j=0;j<hh;j++){
+      const taper=Math.round((1-j/hh)*hw*0.3);
+      rect(ctx,hx+taper,hy+j,Math.max(2,hw-taper*2),1,j===Math.round(hh*0.5)?dark:col);
+    }
+    // Forked tongue
+    if(Math.sin(t*0.12)>0.3){
+      px(ctx,hx+2,hy+hh,"#f44336"); px(ctx,hx+1,hy+hh+1,"#f44336"); px(ctx,hx+3,hy+hh+1,"#f44336");
+    }
+  } else if(headType==="gorilla"){
+    // Big brow ridge, wide nostrils
+    rect(ctx,hx,hy,hw,3,dark); // brow shelf
+    rect(ctx,hx+Math.round(hw*0.15),hy+Math.round(hh*0.5),Math.round(hw*0.7),Math.round(hh*0.4),dark);
+    px(ctx,hx+Math.round(hw*0.3),hy+Math.round(hh*0.55),dark); px(ctx,hx+Math.round(hw*0.6),hy+Math.round(hh*0.55),dark);
+  } else if(headType==="elephant"){
+    // Wide head, trunk base
+    rect(ctx,hx+Math.round(hw*0.3),hy+Math.round(hh*0.5),Math.round(hw*0.4),Math.round(hh*0.45),dark);
+  } else if(headType==="rhino"){
+    // Broad armored head
+    rect(ctx,hx,hy,hw,2,dark); rect(ctx,hx,hy+2,hw,1,acc); // armor plates
+    // Horn
+    for(let i=0;i<5;i++) px(ctx,hx+Math.round(hw*0.35)+Math.round(i*0.2),hy-1-i,dark);
+  } else if(headType==="hippo"){
+    // Very wide jaw
+    rect(ctx,hx,hy+Math.round(hh*0.4),hw,Math.round(hh*0.55),dark);
+    rect(ctx,hx+1,hy+Math.round(hh*0.45),hw-2,Math.round(hh*0.45),col);
+    // Nostrils on top
+    px(ctx,hx+Math.round(hw*0.35),hy+2,dark); px(ctx,hx+Math.round(hw*0.6),hy+2,dark);
+  } else if(headType==="bat"){
+    // Big ears built into head
+    rect(ctx,hx-2,hy-4,3,5,dark); rect(ctx,hx-1,hy-3,2,4,col); // left ear
+    rect(ctx,hx+hw-1,hy-4,3,5,dark); rect(ctx,hx+hw,hy-3,2,4,col); // right ear
+    // Flat nose
+    px(ctx,hx+Math.round(hw/2)-1,hy+Math.round(hh*0.4),dark); px(ctx,hx+Math.round(hw/2)+1,hy+Math.round(hh*0.4),dark);
+  } else if(headType==="fox"){
+    // Pointed snout, wide cheeks
+    rect(ctx,hx+Math.round(hw*0.1),hy+Math.round(hh*0.3),Math.round(hw*0.8),Math.round(hh*0.65),col);
+    for(let i=0;i<4;i++) px(ctx,hx+Math.round(hw/2)-Math.round(i*0.3),hy+Math.round(hh*0.3)+i,dark); // pointed tip
+  } else if(headType==="raccoon"){
+    // Mask pattern
+    rect(ctx,hx+1,hy+1,hw-2,Math.round(hh*0.45),dark); // mask
+    rect(ctx,hx+2,hy+2,hw-4,Math.round(hh*0.35),col);   // mask inner
+    px(ctx,hx+Math.round(hw/2),hy+Math.round(hh*0.5),dark); // nose
+  } else if(headType==="panda"){
+    // Eye patches
+    rect(ctx,hx+1,hy+1,Math.round(hw*0.35),Math.round(hh*0.45),dark); // left patch
+    rect(ctx,hx+hw-Math.round(hw*0.35)-1,hy+1,Math.round(hw*0.35),Math.round(hh*0.45),dark); // right patch
+    // Wide round snout
+    rect(ctx,hx+Math.round(hw*0.2),hy+Math.round(hh*0.5),Math.round(hw*0.6),Math.round(hh*0.4),dark);
+    rect(ctx,hx+Math.round(hw*0.25),hy+Math.round(hh*0.55),Math.round(hw*0.5),Math.round(hh*0.3),col);
+  }
+
+  rect(ctx,hx,hy,hw,hh,col);
+  rect(ctx,hx+1,hy+1,hw-2,1,light);
+  rect(ctx,hx,hy+hh-Math.max(1,Math.round(2*sc)),hw,Math.max(1,Math.round(2*sc)),dark);
+  if(p.accent) rect(ctx,hx+1,hy+Math.round(hh*0.5),hw-2,Math.max(1,Math.round(hh*0.18)),p.accent);
+
+  // ── EXTRAS (drawn on top of head/body) ───────────────────────────────────
+  if(isAdult||isElder) (extras||[]).forEach(e => drawExtra(ctx, e, hx, hy, hw, hh, bx, by, bw, bh, sc, frame, p));
+
+  // ── ANIMAL HORNS — adult/elder only
+  if(isAdult||isElder) drawHorns(ctx, hornType, hx, hy, hw, hh, t, p);
+
+  // ── ANIMAL EARS — teen+ only
+  if(!isBaby) drawEars(ctx, earType, hx, hy, hw, hh, t, p);
+
+  // ── EYES ─────────────────────────────────────────────────────────────────
+  const poopSqueeze=action==="poop"&&((t*(1/5.0))%1)<0.5;
+  const blink=!dead&&!sleeping&&!poopSqueeze&&Math.sin(t*2.4)>-0.98;
+  // Baby: override eye style to simple beady. Teen: allow beady/big/wide only
+  const effectiveEyeStyle = isBaby ? "beady" : isTeen && !["beady","big","wide","sleepy"].includes(eyeStyle) ? "beady" : eyeStyle;
+  // Baby: only smile mouth. Teen: no complex mouths
+  const effectiveMouthStyle = isBaby ? "smile" : isTeen && ["lamprey","proboscis","tusk_grin","horse_lip","bear_snout"].includes(mouthStyle) ? "smile" : mouthStyle;
+  const ey=hy+Math.max(1,Math.round(2*sc)), ew=Math.max(1,Math.round(2*sc));
+  if(effectiveEyeStyle==="cyclops"){
+    rect(ctx,hx+Math.round(hw/2)-ew,ey,ew*2,blink?ew*2:1,p.eye);
+    if(blink) px(ctx,hx+Math.round(hw/2),ey+1,p.pupil);
+  } else if(effectiveEyeStyle==="big"){
+    rect(ctx,hx+1,ey,ew+1,blink?ew+1:1,p.eye); rect(ctx,hx+hw-ew-2,ey,ew+1,blink?ew+1:1,p.eye);
+    if(blink){ px(ctx,hx+2,ey+1,p.pupil); px(ctx,hx+hw-ew-1,ey+1,p.pupil); }
+  } else if(effectiveEyeStyle==="beady"){
+    if(blink){ px(ctx,hx+2,ey,p.pupil); px(ctx,hx+hw-3,ey,p.pupil); }
+  } else if(effectiveEyeStyle==="compound"){
+    rect(ctx,hx+1,ey,ew+1,blink?ew:1,p.eye); rect(ctx,hx+hw-ew-2,ey,ew+1,blink?ew:1,p.eye);
+    if(blink){ px(ctx,hx+1,ey,p.pupil); px(ctx,hx+2,ey,p.pupil); px(ctx,hx+hw-ew-2,ey,p.pupil); px(ctx,hx+hw-ew-1,ey,p.pupil); }
+  } else if(effectiveEyeStyle==="sleepy"){
+    rect(ctx,hx+1,ey,ew+1,1,dark); rect(ctx,hx+hw-ew-2,ey,ew+1,1,dark);
+  } else if(effectiveEyeStyle==="angry"){
+    if(blink){ px(ctx,hx+2,ey+1,p.pupil); px(ctx,hx+hw-3,ey+1,p.pupil); }
+    rect(ctx,hx+1,ey,ew+1,1,dark); rect(ctx,hx+hw-ew-2,ey,ew+1,1,dark);
+  } else if(effectiveEyeStyle==="wide"){
+    rect(ctx,hx+1,ey-1,ew+2,blink?ew+2:1,p.eye); rect(ctx,hx+hw-ew-3,ey-1,ew+2,blink?ew+2:1,p.eye);
+    if(blink){ rect(ctx,hx+2,ey,ew,ew,p.pupil); rect(ctx,hx+hw-ew-2,ey,ew,ew,p.pupil); }
+  } else if(effectiveEyeStyle==="swirl"){
+    if(blink){
+      px(ctx,hx+2,ey,p.eye); px(ctx,hx+3,ey+1,p.pupil); px(ctx,hx+2,ey+2,p.eye);
+      px(ctx,hx+hw-3,ey,p.eye); px(ctx,hx+hw-4,ey+1,p.pupil); px(ctx,hx+hw-3,ey+2,p.eye);
+    }
+  } else if(effectiveEyeStyle==="line"){
+    rect(ctx,hx+1,ey,ew+2,1,dark); rect(ctx,hx+hw-ew-3,ey,ew+2,1,dark);
+  } else if(effectiveEyeStyle==="stacked"){
+    if(blink){ px(ctx,hx+2,ey,p.pupil); px(ctx,hx+2,ey+2,p.eye); px(ctx,hx+hw-3,ey,p.pupil); px(ctx,hx+hw-3,ey+2,p.eye); }
+  } else if(effectiveEyeStyle==="stalked"){
+    for(let j=0;j<3;j++){ px(ctx,hx+2,hy-j,dark); px(ctx,hx+hw-3,hy-j,dark); }
+    px(ctx,hx+2,hy-3,p.eye); px(ctx,hx+hw-3,hy-3,p.eye);
+  } else if(effectiveEyeStyle==="three"){
+    if(blink){ px(ctx,hx+2,ey,p.pupil); px(ctx,hx+Math.round(hw/2),ey-1,p.pupil); px(ctx,hx+hw-3,ey,p.pupil); }
+  } else if(effectiveEyeStyle==="no_eyes"){
+    // creepy blank
+  } else if(effectiveEyeStyle==="cat_slit"){
+    rect(ctx,hx+1,ey,ew+1,blink?ew+1:1,p.eye); rect(ctx,hx+hw-ew-2,ey,ew+1,blink?ew+1:1,p.eye);
+    if(blink){ px(ctx,hx+2,ey,p.pupil); px(ctx,hx+2,ey+ew,p.pupil); px(ctx,hx+hw-3,ey,p.pupil); px(ctx,hx+hw-3,ey+ew,p.pupil); }
+  } else if(effectiveEyeStyle==="goat_rect"){
+    // Horizontal rectangular pupil
+    rect(ctx,hx+1,ey,ew+1,blink?ew+1:1,p.eye); rect(ctx,hx+hw-ew-2,ey,ew+1,blink?ew+1:1,p.eye);
+    if(blink){ rect(ctx,hx+1,ey+1,ew+1,1,p.pupil); rect(ctx,hx+hw-ew-2,ey+1,ew+1,1,p.pupil); }
+  } else if(effectiveEyeStyle==="snake_slit"){
+    px(ctx,hx+3,ey,p.eye); px(ctx,hx+hw-4,ey,p.eye);
+    if(blink){ px(ctx,hx+3,ey,p.pupil); px(ctx,hx+hw-4,ey,p.pupil); }
+  } else if(effectiveEyeStyle==="bug_dome"){
+    rect(ctx,hx,ey-1,ew+2,blink?ew+3:1,p.eye); rect(ctx,hx+hw-ew-2,ey-1,ew+2,blink?ew+3:1,p.eye);
+    if(blink){ for(let i=0;i<3;i++) for(let j=0;j<3;j++) px(ctx,hx+i,ey+j,i===j?p.pupil:p.eye); }
+  } else if(effectiveEyeStyle==="bird_side"){
+    // Eyes on sides of head
+    px(ctx,hx,ey,p.eye); px(ctx,hx+hw-1,ey,p.eye);
+    if(blink){ px(ctx,hx,ey,p.pupil); px(ctx,hx+hw-1,ey,p.pupil); }
+  }
+
+  if(sleeping){ px(ctx,hx+hw,hy-1,"#b39ddb"); px(ctx,hx+hw+1,hy-2,"#7e57c2"); px(ctx,hx+hw+2,hy-3,"#4527a0"); }
+
+  // ── MOUTH ────────────────────────────────────────────────────────────────
+  if(!sleeping){
+    const chomp=["eat","drink","cook","attack"].includes(action)&&Math.sin(t*0.2)>0;
+    const my=hy+hh-Math.max(2,Math.round(3*sc));
+    if(effectiveMouthStyle==="smile"){ px(ctx,hx+1,my+1,dark); rect(ctx,hx+2,my+2,hw-4,1,dark); px(ctx,hx+hw-2,my+1,dark); }
+    else if(effectiveMouthStyle==="frown"){ px(ctx,hx+1,my+2,dark); rect(ctx,hx+2,my+1,hw-4,1,dark); px(ctx,hx+hw-2,my+2,dark); }
+    else if(effectiveMouthStyle==="fangs"){ rect(ctx,hx+1,my+1,hw-2,1,dark); px(ctx,hx+2,my+2,p.eye); px(ctx,hx+hw-3,my+2,p.eye); }
+    else if(effectiveMouthStyle==="beak"||effectiveMouthStyle==="beak_open"){
+      const open=effectiveMouthStyle==="beak_open"||chomp;
+      rect(ctx,hx+Math.round(hw*0.25),my,Math.round(hw*0.5),2,"#f9a825");
+      if(open) rect(ctx,hx+Math.round(hw*0.25),my+2,Math.round(hw*0.5),1,"#222");
+    } else if(effectiveMouthStyle==="big"){
+      rect(ctx,hx+1,my,hw-2,chomp?3:2,dark);
+      if(chomp){ px(ctx,hx+2,my,p.eye); px(ctx,hx+hw-3,my,p.eye); }
+    } else if(effectiveMouthStyle==="zigzag"){ for(let i=0;i<hw-2;i++) px(ctx,hx+1+i,my+(i%2),dark); }
+    else if(effectiveMouthStyle==="proboscis"){ rect(ctx,hx+Math.round(hw/2)-1,my,2,4,dark); }
+    else if(effectiveMouthStyle==="lamprey"){
+      rect(ctx,hx+2,my-1,hw-4,3,dark);
+      for(let i=0;i<hw-4;i+=2) px(ctx,hx+2+i,my,acc);
+    } else if(effectiveMouthStyle==="tusk_grin"){
+      px(ctx,hx+1,my+1,dark); rect(ctx,hx+2,my+2,hw-4,1,dark); px(ctx,hx+hw-2,my+1,dark);
+      rect(ctx,hx+2,my+2,2,3,light); rect(ctx,hx+hw-4,my+2,2,3,light);
+    } else if(effectiveMouthStyle==="sideways"){
+      rect(ctx,hx+Math.round(hw*0.6),my-1,2,hh-my+hy+2,dark);
+    } else if(effectiveMouthStyle==="horse_lip"){
+      rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),2,col);
+      rect(ctx,hx+Math.round(hw*0.25),my+2,Math.round(hw*0.5),1,dark);
+      if(chomp) rect(ctx,hx+Math.round(hw*0.2),my+2,Math.round(hw*0.6),2,dark);
+    } else if(effectiveMouthStyle==="dog_pant"){
+      rect(ctx,hx+1,my,hw-2,2,dark);
+      if(chomp||Math.sin(t*1.5)>0){ // panting tongue
+        rect(ctx,hx+Math.round(hw*0.3),my+2,Math.round(hw*0.4),3,"#f48fb1");
+        px(ctx,hx+Math.round(hw/2),my+4,"#e91e63");
+      }
+    } else if(effectiveMouthStyle==="duck_bill"){
+      rect(ctx,hx+Math.round(hw*0.15),my,Math.round(hw*0.7),2,"#f9a825");
+      rect(ctx,hx+Math.round(hw*0.15),my+2,Math.round(hw*0.7),2,"#ef6c00");
+    } else if(effectiveMouthStyle==="elephant_mouth"){
+      // Small mouth below trunk area
+      rect(ctx,hx+Math.round(hw*0.3),my+1,Math.round(hw*0.4),1,dark);
+    } else if(effectiveMouthStyle==="fish_mouth"){
+      // Round O mouth
+      rect(ctx,hx+Math.round(hw*0.3),my,Math.round(hw*0.4),1,dark);
+      rect(ctx,hx+Math.round(hw*0.3),my+2,Math.round(hw*0.4),1,dark);
+      px(ctx,hx+Math.round(hw*0.25),my+1,dark); px(ctx,hx+Math.round(hw*0.7),my+1,dark);
+    } else if(effectiveMouthStyle==="beak_hook"){
+      rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),2,"#ef6c00");
+      for(let i=0;i<3;i++) px(ctx,hx+Math.round(hw*0.75)+i,my+1+i,"#e65100");
+    } else if(effectiveMouthStyle==="frog_wide"){
+      rect(ctx,hx,my,hw,2,dark);
+      if(chomp) rect(ctx,hx+1,my+2,hw-2,2,col);
+    } else if(effectiveMouthStyle==="cat_whisker"){
+      px(ctx,hx+Math.round(hw/2)-1,my,dark); px(ctx,hx+Math.round(hw/2)+1,my,dark);
+      for(let i=0;i<4;i++){ px(ctx,hx-1-i,my+1,dark); px(ctx,hx+hw+i,my+1,dark); }
+    } else if(effectiveMouthStyle==="bear_snout"){
+      rect(ctx,hx+Math.round(hw*0.2),my,Math.round(hw*0.6),2,col);
+      px(ctx,hx+Math.round(hw/2)-1,my-1,dark); px(ctx,hx+Math.round(hw/2)+1,my-1,dark);
+      rect(ctx,hx+Math.round(hw*0.3),my+2,Math.round(hw*0.4),1,dark);
+    }
+  }
+
+  // ── ANIMAL SNOUTS — adult/elder only
+  if(isAdult||isElder) drawSnout(ctx, snoutType, hx, hy, hw, hh, t, p);
+
+  // ── ANIMAL FEET — teen+ only
+  if(!isBaby) drawFeet(ctx, feetType, bx, by, bw, bh, sc, t, p);
+
+  // ── BODY PATTERN — adult/elder only
+  if(isAdult||isElder) drawPattern(ctx, patternType, bx, by, bw, bh, t, p);
+
+  // ── TOOLS ────────────────────────────────────────────────────────────────
+  const toolX=Math.round(bx+bw+1), toolY=Math.round(by+2+bobY), aS=Math.round(armSwing);
+
+  if(action==="chop"){
+    // Axe: long handle, heavy head, sparks on impact
+    const chopPhase=(t*1/2.5)%1;
+    const axH=toolY+Math.max(-6,Math.min(6,aS));
+    rect(ctx,toolX+1,axH,2,8,"#795548");           // handle
+    rect(ctx,toolX-1,axH,6,3,"#78909c");            // axe head wide
+    rect(ctx,toolX-2,axH+1,2,4,"#90a4ae");          // blade
+    px(ctx,toolX-2,axH,"#cfd8dc");                  // blade glint
+    if(chopPhase>0.73&&chopPhase<0.82){             // impact sparks
+      px(ctx,toolX-3,axH+4,"#ffeb3b"); px(ctx,toolX-4,axH+3,"#ff8f00");
+      px(ctx,toolX-2,axH+5,"#fff176");
+    }
+  } else if(action==="mine"){
+    // Pickaxe: proper cross shape, sparks on rock impact
+    const minePhase=(t*1/2.5)%1;
+    const pickH=toolY+Math.max(-8,Math.min(8,aS));
+    rect(ctx,toolX,pickH+2,2,7,"#795548");           // handle
+    rect(ctx,toolX-3,pickH,8,2,"#78909c");           // pick bar horizontal
+    rect(ctx,toolX-3,pickH,3,1,"#90a4ae");           // left pick point
+    rect(ctx,toolX+4,pickH+1,3,1,"#90a4ae");         // right pick point
+    px(ctx,toolX-4,pickH,"#cfd8dc"); px(ctx,toolX+6,pickH+1,"#cfd8dc"); // glints
+    if(minePhase>0.88&&minePhase<0.97){
+      px(ctx,toolX-4,pickH+2,"#ffeb3b"); px(ctx,toolX-5,pickH+1,"#ff8f00");
+      px(ctx,toolX-3,pickH+3,"#fff176"); px(ctx,toolX-5,pickH+3,"#ffb300");
+    }
+  } else if(action==="fish"){
+    // Proper fishing rod: long pole at angle, line dropping to water, float bob
+    const fishPhase=(t*1/2.5)%1;
+    const lineY=by+bh+3+Math.round(Math.sin(t*1.5)*2); // water level
+    // Rod — long diagonal pole
+    for(let i=0;i<10;i++) px(ctx,toolX+Math.round(i*0.4),toolY-Math.round(i*0.7)+aS,"#795548");
+    px(ctx,toolX+3,toolY-7+aS,"#a1887f"); // rod tip lighter
+    // Fishing line — vertical drop from tip to water
+    const tipX=toolX+4, tipY=toolY-7+aS;
+    for(let i=0;i<lineY-tipY;i++) px(ctx,tipX+Math.round(i*0.15),tipY+i,"#b0bec5");
+    // Float — red/white bobber at water line
+    const floatBob=Math.round(Math.sin(t*0.12)*1);
+    rect(ctx,tipX-1,lineY-1+floatBob,3,2,"#f44336"); // red top
+    rect(ctx,tipX-1,lineY+1+floatBob,3,2,"#eeeeee"); // white bottom
+    // Fish tug sometimes
+    if(Math.sin(t*1.2)>0.85){ px(ctx,tipX-2,lineY+3,"#ef9a9a"); px(ctx,tipX+2,lineY+4,"#ef9a9a"); }
+  } else if(action==="build"){
+    // Hammer — proper T shape
+    const buildPhase=(t*1/3.0)%1;
+    rect(ctx,toolX,toolY+aS,2,7,"#795548");         // handle
+    rect(ctx,toolX-2,toolY+aS,6,3,"#ffb74d");       // hammer head
+    rect(ctx,toolX-2,toolY+aS,2,4,"#ffa000");       // face side
+    if(buildPhase>0.52&&buildPhase<0.68){
+      px(ctx,toolX-2,toolY+aS+3,"#ffe082");          // impact flash
+    }
+  } else if(action==="smith"){
+    // Blacksmith hammer hitting anvil — anvil visible below
+    const smithPhase=(t*1/2.5)%1;
+    const hamH=toolY+Math.max(-2,Math.min(6,aS));
+    rect(ctx,toolX,hamH,2,6,"#795548");             // handle
+    rect(ctx,toolX-2,hamH,6,3,"#546e7a");           // hammer head
+    px(ctx,toolX-2,hamH,"#78909c"); px(ctx,toolX+3,hamH,"#78909c"); // glints
+    // Anvil below
+    rect(ctx,toolX-3,by+bh+2,9,3,"#455a64");
+    rect(ctx,toolX-2,by+bh+1,7,2,"#546e7a");
+    if(smithPhase>0.52&&smithPhase<0.65){
+      px(ctx,toolX-1,hamH+3,"#ffeb3b"); px(ctx,toolX+1,hamH+3,"#ff8f00"); // sparks
+      px(ctx,toolX,hamH+4,"#fff176");
+    }
+  } else if(action==="eat"){
+    // Big chunky food item — clear leg of meat/food raised to mouth level
+    const eatPhase=(t*1/4.0)%1;
+    const chomp=eatPhase>0.3&&eatPhase<0.7;
+    const foodY=toolY+aS; // follows arm up to mouth
+    rect(ctx,toolX,foodY,4,6,"#ef9a9a");            // food item
+    rect(ctx,toolX+1,foodY-1,2,2,"#a5d6a7");        // vegetable bit on top
+    rect(ctx,toolX-1,foodY+5,6,2,"#795548");        // bone/handle
+    if(chomp){
+      px(ctx,toolX,foodY,"#e57373"); // bite mark
+      px(ctx,toolX+1,foodY,"#e57373");
+    }
+  } else if(action==="drink"){
+    // Big cup/mug being tipped — clearly a drink
+    const drinkPhase=(t*1/3.0)%1;
+    const tilt=drinkPhase>0.2&&drinkPhase<0.65?1:0;
+    const cupY=toolY+aS;
+    rect(ctx,toolX,cupY,5,6,"#78909c");             // mug body
+    rect(ctx,toolX+5,cupY+1,2,3,"#90a4ae");        // handle
+    rect(ctx,toolX+1,cupY+1,3,1,"#b3e5fc");        // liquid inside
+    if(tilt){
+      px(ctx,toolX+2,cupY-1,"#b3e5fc");            // liquid dripping as tipping
+      px(ctx,toolX+3,cupY-2,"#90caf9");
+    }
+    rect(ctx,toolX,cupY,5,1,"#90a4ae");             // rim
+  } else if(action==="cook"){
+    // Cooking pot on fire with stirring spoon — much clearer
+    const cookPhase=(t*1/3.0)%1;
+    // Pot sitting in front of creature
+    const potX=bx-4, potY=by+bh-3;
+    rect(ctx,potX,potY,9,6,"#546e7a");              // pot body
+    rect(ctx,potX-1,potY,11,2,"#607d8b");           // pot rim
+    rect(ctx,potX+1,potY+2,7,3,"#b3e5fc");         // liquid inside
+    // Bubbles
+    if(Math.sin(t*0.2)>0.4) px(ctx,potX+2,potY+1,"#b3e5fc");
+    if(Math.sin(t*0.2+1)>0.5) px(ctx,potX+5,potY+1,"#90caf9");
+    // Fire underneath
+    px(ctx,potX+1,potY+6,"#ff8f00"); px(ctx,potX+3,potY+6,"#ff8f00");
+    px(ctx,potX+5,potY+6,"#ff8f00"); px(ctx,potX+2,potY+7,"#ffb300");
+    px(ctx,potX+4,potY+7,"#ffb300");
+    // Spoon — arm holds it over pot
+    rect(ctx,toolX,toolY+aS,1,5,"#795548");         // spoon handle
+    rect(ctx,toolX-1,toolY+aS+4,3,2,"#a1887f");    // spoon bowl
+  } else if(action==="gather"){
+    // Plant/mushroom/berry on ground — creature bends to pick it
+    const gatherPhase=(t*1/3.0)%1;
+    const groundY=by+bh+2;
+    const reaching=gatherPhase>0.2&&gatherPhase<0.65;
+    // Item on ground
+    rect(ctx,bx-3,groundY,3,3,"#66bb6a");           // green plant
+    px(ctx,bx-2,groundY-1,"#81c784");              // leaf
+    px(ctx,bx-1,groundY-2,"#388e3c");
+    rect(ctx,bx-4,groundY+2,2,2,"#ef9a9a");        // berry
+    px(ctx,bx-3,groundY+1,"#e91e63");
+    // Only show item being held when standing back up (picked!)
+    if(!reaching&&gatherPhase>0.65){
+      px(ctx,toolX,toolY+aS,"#66bb6a");             // item in hand
+      px(ctx,toolX+1,toolY+aS,"#81c784");
+    }
+  } else if(action==="pump"){
+    rect(ctx,toolX,toolY,2,10,"#546e7a");
+    rect(ctx,toolX-2,toolY+Math.round(bobY)+4,6,3,"#90a4ae");
+    rect(ctx,toolX-1,by+bh+2,4,3,"#37474f");       // pump base
+  } else if(action==="hunt"){
+    // Arrow/bow
+    for(let i=0;i<8;i++) px(ctx,toolX+i,toolY+aS-Math.round(i*0.5),"#795548");
+    px(ctx,toolX+8,toolY+aS-4,"#ef9a9a");           // arrowhead
+    px(ctx,toolX,toolY+aS+1,"#a5d6a7");             // fletching
+  } else if(action==="carry"){
+    rect(ctx,bx+1,by-5,bw-2,5,"#ff8f00");
+    rect(ctx,bx+2,by-4,bw-4,3,"#ffa000");
+    px(ctx,bx+1,by-5,"#795548"); px(ctx,bx+bw-2,by-5,"#795548"); // handles
+  } else if(action==="attack"){
+    rect(ctx,toolX,toolY+aS,1,9,"#78909c");
+    rect(ctx,toolX-1,toolY+aS,3,2,"#cfd8dc");
+    px(ctx,toolX,toolY+aS,"#fff"); // glint
+  } else if(action==="poop"){
+    // Poop drop — appears at end of squeeze phase
+    const poopPhase=(t*1/5.0)%1;
+    if(poopPhase>0.5){
+      const dropDist=Math.round((poopPhase-0.5)/0.5*6);
+      rect(ctx,bx+Math.round(bw/2)-1,by+bh+dropDist,4,4,"#5d4037");
+      rect(ctx,bx+Math.round(bw/2),by+bh-1+dropDist,2,3,"#6d4c41");
+      px(ctx,bx+Math.round(bw/2)+1,by+bh-2+dropDist,"#795548");
+      // Stink lines
+      if(dropDist>3){
+        px(ctx,bx+Math.round(bw/2)-2,by+bh+2,"#c8e6c9");
+        px(ctx,bx+Math.round(bw/2)+3,by+bh+1,"#c8e6c9");
+      }
+    }
+    // Squeeze eyes shut — done in eye section via poopPhase
+  } else if(action==="dance"){
+    // Musical notes flying off while dancing
+    const dp=(t/2.5)%1;
+    if(dp<0.5){ px(ctx,bx+bw+2,by-Math.round(dp*8),"#e91e63"); px(ctx,bx+bw+3,by-Math.round(dp*8)-1,"#e91e63"); }
+    if(dp>0.25&&dp<0.75){ px(ctx,bx-3,by-Math.round((dp-0.25)*8),"#9c27b0"); }
+    if(dp>0.5){ px(ctx,bx+bw+1,by-Math.round((dp-0.5)*8),"#f48fb1"); }
+  }
+
+  // ── DEATH — grey out, X eyes, no movement ────────────────────────────────
+  if(dead){
+    // Desaturate to grey — overlay white then grey
+    const greyAmt=Math.min(t*0.9,0.75);
+    ctx.fillStyle=`rgba(200,200,200,${greyAmt})`; ctx.fillRect(0,0,W*SC,H*SC);
+    // X eyes
+    const exEy=hy+Math.max(1,Math.round(2*sc));
+    [hx+2,hx+hw-4].forEach(ex=>{
+      px(ctx,ex,  exEy,  "#333"); px(ctx,ex+1,exEy+1,"#333");
+      px(ctx,ex+1,exEy,  "#333"); px(ctx,ex,  exEy+1,"#333");
+    });
+  }
+  // ── ELDER — hunched look, wrinkle marks, grey tint ────────────────────────
+  if(isElder){
+    // Wrinkle lines on face
+    px(ctx,hx+2,hy+2,dark); px(ctx,hx+hw-3,hy+2,dark);
+    px(ctx,hx+3,hy+4,dark); px(ctx,hx+hw-4,hy+4,dark);
+    // Slight grey film
+    ctx.fillStyle="rgba(200,200,200,0.12)"; ctx.fillRect(0,0,W*SC,H*SC);
+  }
+
+  // ── LIFTED visual ────────────────────────────────────────────────────────
+  if(isLifted){
+    // Poop drop with delay
+    if(t>30){
+      rect(ctx,bx+Math.round(bw/2),by+bh+4+Math.min(t-30,8),3,3,"#5d4037");
+      px(ctx,bx+Math.round(bw/2)+1,by+bh+3+Math.min(t-30,8),"#6d4c41");
+    }
+    // Grab hand above
+    ctx.fillStyle="rgba(255,200,150,0.85)";
+    ctx.fillRect((bx+Math.round(bw/2)-2)*SC,(by-6)*SC,6*SC,3*SC);
+    for(let i=0;i<4;i++) ctx.fillRect((bx+Math.round(bw/2)-2+i)*SC,(by-7)*SC,SC,2*SC);
+  }
+}
+
+// ─── MINI CANVAS ─────────────────────────────────────────────────────────────
+const MSC=1.5;
+
+// ═══════════════════════════════════════════════════════════════════
+// WORLD STATE
+// ═══════════════════════════════════════════════════════════════════
+
+const BIOME_BG = {
+  forest:"biome-forest", tundra:"biome-tundra", desert:"biome-desert",
+  wasteland:"biome-wasteland", moon:"biome-moon", nuclear:"biome-nuclear"
+};
+
+const STAGE_COLORS = {egg:"#8855ff",baby:"#f48fb1",teen:"#81d4fa",adult:"#a5d6a7",elder:"#bcaaa4"};
+
+let world = {
+  biome:"forest", tick:0, day:1, isNight:false, season:"spring",
+  paused:false, speed:1,
+  resources:{food:80,wood:50,stone:30,honey:0,ore:0},
+  population:[], eggs:[],
+  graves:[],
+  buildings:[], fires:[], statues:[],
+  politicalSystem:"equality", leader:null,
+  generationEvents:[], generation:1,
+  morale:60,
+  observations:new Set(),
+  journal:[],
+  inventory:{
+    cookie:5, mystery_egg:0, axe:0, fishing_rod:0, spear:0,
+    hunting_bow:0, pickaxe:0, ball:0, honey_jar:0, cookie_jar:0,
+    crown:0, flag:0, magic_ring:0, statue:0, party_hat:0,
+  },
+  _lastEggTick:0, _firstEggSent:false,
+  _pendingVossLine:null,
+};
+
+let selectedPet = null;
+let selectedItem = null;
+let _pid = 1;
+let _frame = 0;
+let _animFrame = null;
+let _lastTickTime = 0;
+let _tickAccum = 0;
+const TICK_MS = 1000;
+
+// Voss queue
+let vossQueue = [];
+let vossCurrentUntil = 0;
+let vossLastFinished = 0;
+
+// ═══════════════════════════════════════════════════════════════════
+// ITEMS DEFINITION
+// ═══════════════════════════════════════════════════════════════════
+const ITEMS = [
+  {id:"cookie",       emoji:"🍪", name:"Cookie",       desc:"Feed a petricule. Reduces hunger immediately.", hint:"Click → click creature",       locked:false, stackable:true},
+  {id:"mystery_egg",  emoji:"🥚", name:"Mystery Egg",  desc:"Hatch a new random petricule. Takes time.",     hint:"Click to hatch immediately",    locked:false, stackable:true},
+  {id:"ball",         emoji:"⚽", name:"Ball",         desc:"Increases sociability. Triggers play behavior.", hint:"Drop near group",               locked:true,  stackable:false},
+  {id:"fishing_rod",  emoji:"🎣", name:"Fishing Rod",  desc:"Teaches fishing. Unlocks fish food source.",    hint:"Give to adult near water",      locked:true,  stackable:false},
+  {id:"axe",          emoji:"🪓", name:"Axe",          desc:"Increases wood harvest speed dramatically.",    hint:"Give to any adult",             locked:true,  stackable:false},
+  {id:"pickaxe",      emoji:"⛏️",  name:"Pickaxe",      desc:"Unlocks stone and ore mining.",                hint:"Give to adult near rock",       locked:true,  stackable:false},
+  {id:"spear",        emoji:"🗡️",  name:"Spear",        desc:"Increases hunt success. May increase aggression.", hint:"Give to hunter",            locked:true,  stackable:false},
+  {id:"hunting_bow",  emoji:"🏹", name:"Hunting Bow",  desc:"Long-range hunting. Less aggression spike than spear.", hint:"Give to hunter",       locked:true,  stackable:false},
+  {id:"honey_jar",    emoji:"🍯", name:"Honey Jar",    desc:"The highest gift. Initiates breeding. Piety +5.", hint:"Give to two creatures",      locked:true,  stackable:false},
+  {id:"cookie_jar",   emoji:"🫙", name:"Cookie Jar",   desc:"Stores food surplus. Prevents starvation seasons.", hint:"Drop in settlement",       locked:true,  stackable:false},
+  {id:"crown",        emoji:"👑", name:"Crown",        desc:"Whoever holds it becomes leader. Everything changes.", hint:"Give to one creature",   locked:true,  stackable:false},
+  {id:"flag",         emoji:"🚩", name:"Flag",         desc:"Marks territory. Enables faction identification.", hint:"Place in world",            locked:true,  stackable:false},
+  {id:"magic_ring",   emoji:"💍", name:"Magic Ring",   desc:"Protects lone creature from mob violence.",     hint:"Give to vulnerable creature",  locked:true,  stackable:false},
+  {id:"statue",       emoji:"🗿", name:"Statue",       desc:"Focus point for worship. Raises piety over time.", hint:"Place in world",            locked:true,  stackable:false},
+  {id:"party_hat",    emoji:"🎉", name:"Party Hat",    desc:"Celebrates first birth. Boosts morale.",        hint:"Give to any creature",         locked:true,  stackable:false},
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// VOSS LINES (simplified — full system in voss.js)
+// ═══════════════════════════════════════════════════════════════════
+const VOSS = {
+  first_fire:     ["They figured it out.", "There it is.", "Fire. Everything changes now."],
+  first_baby:     ["New one.", "Generation two.", "It worked."],
+  first_fight:    ["First blood.", "It was going to happen."],
+  first_murder:   [null, null, "That was deliberate."],
+  first_honey:    [null, "Everyone stopped.", "They all felt it at once."],
+  elder_sacrificed:[null, null, null, "I'm not going to say anything."],
+  holy_egg:       [null, "Something different came out of that one.", "Watch it closely."],
+  last_one:       ["Last one.", "That's the end of that line.", "I'll send something. Give it a minute."],
+  warlord:        [null, null, "I've seen this before."],
+  group_chorus:   ["Listen.", null],
+  first_elder:    ["One of them got old.", "First elder."],
+  first_building: ["They built something that will outlast them.", "First structure."],
+  starvation:     ["They're running out.", "It's getting desperate."],
+  cold_death:     ["The cold took it.", null],
+  harmony:        ["They made it. I didn't know if they would."],
+  voss_egg:       ["Keep it safe. It takes an hour. I'll send more when I can."],
+};
+
+function getVossLine(key) {
+  const lines = VOSS[key];
+  if (!lines) return null;
+  const l = lines[Math.floor(Math.random()*lines.length)];
+  return l; // null = intentional silence
+}
+
+function queueVoss(key) {
+  const text = getVossLine(key);
+  if (text === undefined) return;
+  if (text === null) return; // silence
+  vossQueue.push({text, key});
+}
+
+function tickVoss(nowMs) {
+  const box = document.getElementById('voss-box');
+  if (nowMs < vossCurrentUntil) return;
+  if (vossQueue.length === 0) { box.classList.remove('visible'); return; }
+  if (nowMs - vossLastFinished < 1500) return;
+  const next = vossQueue.shift();
+  document.getElementById('voss-text').textContent = `"${next.text}"`;
+  box.classList.add('visible');
+  vossCurrentUntil = nowMs + 4500;
+  vossLastFinished = vossCurrentUntil;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// OBSERVATION SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+function fireObs(key, data={}) {
+  const ONCE_ONLY = new Set([
+    "first_fire","first_baby","first_fight","first_murder","first_honey",
+    "first_elder","first_building","first_theft","holy_egg","warlord",
+    "first_fish","first_cook","near_water","hits_tree","near_rock",
+    "two_species","elder_exile","elder_sacrifice"
+  ]);
+  if (ONCE_ONLY.has(key) && world.observations.has(key)) return null;
+  world.observations.add(key);
+  queueVoss(key);
+
+  // Item unlocks
+  const ITEM_UNLOCKS = {
+    first_fire:     ["spear","hunting_bow"],
+    near_water:     ["fishing_rod"],
+    first_fish:     [],
+    first_baby:     ["ball","party_hat"],
+    hits_tree:      ["axe"],
+    near_rock:      ["pickaxe"],
+    first_honey:    ["honey_jar"],
+    first_murder:   ["magic_ring"],
+    first_fight:    ["hunting_bow"],
+    first_elder:    [],
+    first_building: [],
+    stockpiling:    ["cookie_jar"],
+    two_species:    ["flag"],
+    mob_vs_one:     ["magic_ring"],
+    crown_claim:    [],
+  };
+  const unlocks = ITEM_UNLOCKS[key] || [];
+  unlocks.forEach(itemId => {
+    const item = ITEMS.find(i => i.id === itemId);
+    if (item && item.locked) {
+      item.locked = false;
+      flashObs(`🔓 ${item.name} unlocked!`);
+    }
+  });
+
+  // Journal
+  if (data.journalWorthy) {
+    world.journal.push({key, day:world.day, gen:world.generation, data, ts:Date.now()});
+  }
+
+  return {key, data};
+}
+
+function flashObs(msg) {
+  const el = document.getElementById('obs-flash');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PETRICULE FACTORY
+// ═══════════════════════════════════════════════════════════════════
+function createPetricule(genomeOverride={}, stage="baby") {
+  const genome = generateGenome();
+  Object.assign(genome, genomeOverride);
+
+  // DISHBORN behavioral genome
+  if (!genome.aggression)   genome.aggression   = rndInt(0,100);
+  if (!genome.intelligence) genome.intelligence = rndInt(0,100);
+  if (!genome.sociability)  genome.sociability  = rndInt(0,100);
+  if (!genome.curiosity)    genome.curiosity    = rndInt(0,100);
+  if (!genome.empathy)      genome.empathy      = rndInt(0,100);
+  if (!genome.greed)        genome.greed        = rndInt(0,100);
+  if (!genome.fear)         genome.fear         = rndInt(15,55);
+  if (!genome.creativity)   genome.creativity   = rndInt(0,100);
+  if (!genome.piety)        genome.piety        = rndInt(0,25);
+  if (!genome.ambition)     genome.ambition     = rndInt(0,100);
+  if (!genome.loyalty)      genome.loyalty      = rndInt(0,100);
+  if (!genome.mutation_rate)genome.mutation_rate= rndInt(5,40);
+  if (!genome.voiceType)    genome.voiceType    = assignVoiceType(genome.bodySizeMod, genome.bodyShape, genome.earType, genome.tailType);
+  if (!genome.biomePref)    genome.biomePref    = rnd(BIOME_PREFS);
+
+  genome.creatureCode = buildCreatureCode(genome);
+
+  const archetypes = detectArchetypes(genome);
+  const isHoly = Math.random() < 0.03;
+
+  return {
+    id: _pid++,
+    genome,
+    archetypes,
+    isHoly,
+    stage,
+    stageTick: 0,
+    hunger: 20 + rndInt(0,20),
+    tired: 10 + rndInt(0,10),
+    cold: 0,
+    action: "idle",
+    actionTimer: 0,
+    x: 80 + Math.random() * 600,
+    y: 0, // set to ground on spawn
+    vx: 0, vy: 0,
+    hat: null,
+    heldItem: null,
+    faction: null,
+    killCount: 0, stealCount: 0, buildCount: 0, childCount: 0,
+    _canvasEl: null, // mini canvas in sidebar
+  };
+}
+
+function detectArchetypes(g) {
+  const a = [];
+  if (g.intelligence >= 82)                                  a.push("genius");
+  if (g.intelligence <= 20)                                  a.push("dim");
+  if (g.empathy <= 10 && g.greed >= 80)                     a.push("evil");
+  if (g.aggression >= 78 && g.ambition >= 75)               a.push("warlord_potential");
+  if (g.aggression >= 40 && g.aggression <= 62 && g.empathy >= 60) a.push("brave");
+  if (g.empathy >= 80 && g.sociability >= 70)               a.push("caregiver");
+  if (g.greed >= 80 && g.intelligence >= 65)                a.push("merchant");
+  if (g.piety >= 65)                                         a.push("devout");
+  if (g.creativity >= 80 && g.intelligence >= 60)           a.push("artist");
+  if (g.ambition >= 75 && g.loyalty <= 30)                  a.push("schemer");
+  if (g.fear >= 80)                                          a.push("coward");
+  if (g.sociability >= 85 && g.aggression <= 30)            a.push("peacemaker");
+  if (g.curiosity >= 85)                                     a.push("explorer");
+  return a.length ? a : ["ordinary"];
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIFECYCLE SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const STAGE_TICKS = { egg:0, baby:300, teen:900, adult:3600, elder:1200 };
+// egg ticks handled by egg objects separately
+
+function tickPet(pet) {
+  pet.stageTick++;
+  pet.actionTimer++;
+
+  // Needs decay (adjusted by speed already in game loop)
+  pet.hunger = Math.min(100, pet.hunger + 0.06);
+  pet.tired  = Math.min(100, pet.tired  + 0.03);
+  if (world.isNight) pet.tired = Math.min(100, pet.tired + 0.04);
+
+  // Cold if biome cold + night
+  if ((world.biome === "tundra" || world.biome === "moon") && world.isNight) {
+    pet.cold = Math.min(100, pet.cold + 0.3);
+  } else {
+    pet.cold = Math.max(0, pet.cold - 0.1);
+  }
+
+  // Death
+  if (pet.hunger >= 100) return {died:true, cause:"starvation"};
+  if (pet.cold   >= 100) return {died:true, cause:"cold"};
+
+  // Stage advance
+  const limit = STAGE_TICKS[pet.stage];
+  if (limit && pet.stageTick >= limit) {
+    advanceStage(pet);
+  }
+
+  // Action decision every 15 ticks
+  if (pet.actionTimer >= 15) {
+    pet.actionTimer = 0;
+    pet.action = decidePetAction(pet);
+  }
+
+  // Movement
+  movePet(pet);
+
+  return {died:false};
+}
+
+function advanceStage(pet) {
+  const next = {baby:"teen", teen:"adult", adult:"elder"}[pet.stage];
+  if (!next) {
+    // Elder dies
+    return {died:true, cause:"old_age"};
+  }
+  pet.stage = next;
+  pet.stageTick = 0;
+  if (next === "elder" && !world.observations.has("first_elder")) {
+    fireObs("first_elder", {petId:pet.id, journalWorthy:true});
+  }
+}
+
+function decidePetAction(pet) {
+  const g = pet.genome;
+  const w = {
+    foodAvail: world.resources.food > 5,
+    fireNearby: world.fires.length > 0,
+    threatNearby: world.population.some(p => p.id !== pet.id && p.genome.aggression > 70 && dist(p,pet) < 100),
+    statuePresent: world.statues.length > 0,
+  };
+
+  if (pet.hunger > 80) return "forage";
+  if (pet.tired  > 85) return "sleep";
+  if (pet.cold   > 50 && !w.fireNearby) return "seek_fire";
+  if (w.threatNearby && g.fear > 50) return "flee";
+
+  // Weighted random
+  const weights = {
+    idle:10, wander:15, socialize:0, forage:0, fish:0,
+    hunt:0, build:0, explore:0, worship:0, steal:0, sing:0,
+  };
+  weights.wander      += g.curiosity * 0.2;
+  weights.socialize   += g.sociability * 0.25;
+  weights.forage      += (pet.hunger * 0.4) + (100-w.foodAvail?20:0);
+  weights.fish        += (100-g.aggression)*0.08;
+  weights.hunt        += g.aggression * 0.08;
+  weights.build       += g.creativity * 0.1 + g.intelligence * 0.08;
+  weights.explore     += g.curiosity * 0.15;
+  weights.worship     += g.piety * 0.2 * (w.statuePresent ? 2 : 1);
+  weights.steal       += g.greed * 0.06 * (pet.hunger > 40 ? 1.5 : 0.5);
+  weights.sing        += g.creativity * 0.04 + g.sociability * 0.04;
+
+  if (pet.stage === "baby")   { weights.wander *= 0.2; weights.socialize += 20; }
+  if (pet.stage === "elder")  { weights.wander *= 0.3; weights.worship *= 2; weights.idle += 20; }
+
+  let total = Object.values(weights).reduce((a,b)=>a+b,0);
+  let roll  = Math.random() * total;
+  for (const [a,w2] of Object.entries(weights)) {
+    roll -= w2;
+    if (roll <= 0) return a;
+  }
+  return "idle";
+}
+
+const GROUND_Y = 0; // set dynamically
+let groundY = 260;
+
+function movePet(pet) {
+  // Simple AI movement
+  const action = pet.action;
+  const speed = pet.stage === "baby" ? 0.4 : pet.stage === "elder" ? 0.5 : 0.8;
+
+  if (action === "idle" || action === "sleep" || action === "worship") {
+    pet.vx *= 0.8;
+  } else if (action === "wander" || action === "explore") {
+    if (Math.random() < 0.02) pet.vx = (Math.random()-0.5) * speed * 2;
+  } else if (action === "flee") {
+    // Move away from nearest aggressive pet
+    const threat = world.population.find(p => p.id !== pet.id && p.genome.aggression > 70);
+    if (threat) {
+      pet.vx = (pet.x > threat.x ? 1 : -1) * speed * 1.5;
+    }
+  } else if (action === "socialize") {
+    // Move toward nearest pet
+    const near = world.population.find(p => p.id !== pet.id && dist(p,pet) > 30 && dist(p,pet) < 200);
+    if (near) pet.vx = (near.x > pet.x ? 1 : -1) * speed * 0.6;
+  } else {
+    pet.vx += (Math.random()-0.5) * 0.3;
+    pet.vx *= 0.9;
+  }
+
+  pet.x = Math.max(20, Math.min(worldW - 20, pet.x + pet.vx));
+  pet.y = groundY; // always on ground (no physics yet)
+}
+
+function dist(a,b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
+
+// ═══════════════════════════════════════════════════════════════════
+// EGG SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+const EGG_HATCH_TICKS = 3600; // 1hr real time at 1x
+
+let pendingHatch = null; // genome waiting for overlay
+
+const EGG_DESIGNS = [
+  {colors:["#c8a0f0","#9966cc"],pattern:"spots"},
+  {colors:["#88ddff","#4499cc"],pattern:"stripes"},
+  {colors:["#ffcc44","#ff8800"],pattern:"speckle"},
+  {colors:["#ff6688","#cc3355"],pattern:"zigzag"},
+  {colors:["#44ffaa","#00cc77"],pattern:"smooth"},
+  {colors:["#ff9944","#cc5500"],pattern:"cracks"},
+  {colors:["#cccccc","#888888"],pattern:"marble"},
+  {colors:["#ff44ff","#8800cc"],pattern:"glow"},
+  {colors:["#111133","#0000ff"],pattern:"void"},
+  {colors:["#ffee00","#ffaa00"],pattern:"holy"},
+];
+
+function spawnEgg(genome=null, fromInventory=false) {
+  const eg = {
+    id: _pid++,
+    genome: genome || null,
+    tick: 0,
+    x: 100 + Math.random() * (worldW - 200),
+    y: groundY,
+    design: EGG_DESIGNS[rndInt(0, EGG_DESIGNS.length-1)],
+    wobble: 0,
+  };
+  world.eggs.push(eg);
+  world.inventory.mystery_egg = Math.max(0, world.inventory.mystery_egg - (fromInventory?1:0));
+  return eg;
+}
+
+function tickEggs() {
+  for (let i = world.eggs.length-1; i >= 0; i--) {
+    const eg = world.eggs[i];
+    eg.tick++;
+    if (eg.tick > EGG_HATCH_TICKS * 0.8) eg.wobble = Math.sin(Date.now()/200)*3;
+    if (eg.tick >= EGG_HATCH_TICKS) {
+      // HATCH!
+      world.eggs.splice(i, 1);
+      const newPet = createPetricule(eg.genome || {}, "baby");
+      newPet.x = eg.x;
+      newPet.y = groundY;
+      pendingHatch = newPet;
+      showHatchOverlay(newPet);
+    }
+  }
+}
+
+function showHatchOverlay(pet) {
+  world.paused = true;
+  const overlay = document.getElementById('hatch-overlay');
+  overlay.classList.add('visible');
+
+  // Draw creature on hatch canvas
+  const canvas = document.getElementById('hatch-egg-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,288,288);
+
+  // Draw at large scale — center it
+  const origSC = SC;
+  drawCreature(ctx, pet.genome, "baby", 0, "idle", false);
+
+  // Name + code
+  document.getElementById('hatch-name').textContent = pet.genome.name.toUpperCase();
+  document.getElementById('hatch-code').textContent = pet.genome.creatureCode;
+
+  // Archetypes
+  const archEl = document.getElementById('hatch-archetypes');
+  archEl.innerHTML = pet.archetypes.map(a => {
+    const cls = a === 'evil' ? 'evil' : a === 'warlord_potential' ? 'evil' : pet.isHoly ? 'holy' : '';
+    return `<div class="arch-tag ${cls}">${a}</div>`;
+  }).join('');
+  if (pet.isHoly) {
+    archEl.innerHTML += '<div class="arch-tag holy">✨ HOLY ONE</div>';
+    document.getElementById('hatch-subtitle').textContent = "Something is different about this one.";
+    document.getElementById('hatch-subtitle').style.color = 'var(--amber)';
+  }
+
+  // Voss line
+  const vossLine = pet.isHoly
+    ? "Something different came out of that one."
+    : pet.archetypes.includes("evil") ? null
+    : pet.archetypes.includes("genius") ? "Smart one."
+    : null;
+  document.getElementById('hatch-voss').textContent = vossLine ? `Voss: "${vossLine}"` : "";
+}
+
+function closeHatch() {
+  document.getElementById('hatch-overlay').classList.remove('visible');
+  document.getElementById('hatch-subtitle').textContent = "A new petricule enters the world.";
+  document.getElementById('hatch-subtitle').style.color = '';
+  if (pendingHatch) {
+    world.population.push(pendingHatch);
+    pendingHatch = null;
+    fireObs("first_baby", {journalWorthy:true});
+  }
+  world.paused = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ITEM SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+function useItemOnPet(itemId, pet) {
+  const item = ITEMS.find(i => i.id === itemId);
+  if (!item || item.locked) return;
+  if (world.inventory[itemId] <= 0 && item.stackable) return;
+
+  switch(itemId) {
+    case "cookie":
+      pet.hunger = Math.max(0, pet.hunger - 40);
+      if (item.stackable) world.inventory.cookie = Math.max(0, world.inventory.cookie - 1);
+      flashObs("🍪 Cookie given — hunger reduced");
+      break;
+    case "mystery_egg":
+      // Use in world, not on pet
+      break;
+    case "axe":
+      pet.genome._hasAxe = true;
+      flashObs("🪓 Axe given — wood harvest doubled");
+      fireObs("hits_tree", {petId:pet.id});
+      break;
+    case "fishing_rod":
+      pet.genome._hasRod = true;
+      flashObs("🎣 Fishing rod given — food +fishing");
+      fireObs("first_fish", {petId:pet.id, journalWorthy:true});
+      break;
+    case "spear":
+      pet.genome._hasSpear = true;
+      pet.genome.aggression = Math.min(100, (pet.genome.aggression||50) + 8);
+      flashObs("🗡️ Spear given — hunt power ↑ aggression ↑");
+      break;
+    case "hunting_bow":
+      pet.genome._hasBow = true;
+      flashObs("🏹 Bow given — ranged hunt unlocked");
+      break;
+    case "honey_jar":
+      pet.genome._hasHoney = true;
+      pet.genome.piety = Math.min(100, (pet.genome.piety||0) + 5);
+      flashObs("🍯 Honey jar given — breeding enabled");
+      fireObs("first_honey", {petId:pet.id, journalWorthy:true});
+      break;
+    case "crown":
+      world.population.forEach(p => { p.hat = null; });
+      pet.hat = "crown";
+      world.leader = pet.id;
+      world.politicalSystem = "monarchy";
+      flashObs("👑 Crown given — monarchy begins");
+      fireObs("crown_claim", {petId:pet.id, journalWorthy:true});
+      break;
+    case "magic_ring":
+      pet.isRingWearer = true;
+      flashObs("💍 Ring given — protected from mob violence");
+      break;
+    case "statue":
+      world.statues.push({x:pet.x, y:groundY});
+      flashObs("🗿 Statue placed — worship site created");
+      break;
+    case "ball":
+      pet.genome.sociability = Math.min(100, (pet.genome.sociability||50) + 10);
+      flashObs("⚽ Ball given — sociability ↑");
+      break;
+    case "party_hat":
+      pet.hat = "party_hat";
+      world.morale = Math.min(100, world.morale + 15);
+      flashObs("🎉 Party hat given — morale +15");
+      break;
+    case "pickaxe":
+      pet.genome._hasPickaxe = true;
+      flashObs("⛏️ Pickaxe given — mining unlocked");
+      fireObs("near_rock", {petId:pet.id});
+      break;
+  }
+  renderItemBar();
+  renderSelectedPanel();
+}
+
+// Voss auto-sends eggs
+function tickVossEggs() {
+  if (!world._firstEggSent && world.tick >= 300) {
+    world._firstEggSent = true;
+    world._lastEggTick = world.tick;
+    world.inventory.mystery_egg++;
+    queueVoss("voss_egg");
+    flashObs("🥚 Voss sent a mystery egg!");
+    renderItemBar();
+  } else if (world._firstEggSent && world.tick - world._lastEggTick >= 3600) {
+    world._lastEggTick = world.tick;
+    world.inventory.mystery_egg++;
+    renderItemBar();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WORLD CANVAS RENDERING
+// ═══════════════════════════════════════════════════════════════════
+const worldCanvas = document.getElementById('world-canvas');
+const worldCtx = worldCanvas.getContext('2d');
+let worldW = 0, worldH = 0;
+
+function resizeWorld() {
+  const wrap = document.getElementById('world-canvas-wrap');
+  worldW = wrap.clientWidth;
+  worldH = wrap.clientHeight;
+  worldCanvas.width = worldW;
+  worldCanvas.height = worldH;
+  groundY = worldH - 70;
+}
+
+function renderWorld() {
+  worldCtx.clearRect(0, 0, worldW, worldH);
+
+  // Stars at night
+  if (world.isNight) {
+    for (let i = 0; i < 60; i++) {
+      const sx = (i * 137.5) % worldW;
+      const sy = (i * 73.1) % (worldH * 0.6);
+      const alpha = 0.3 + Math.sin(Date.now()/2000 + i) * 0.2;
+      worldCtx.fillStyle = `rgba(200,200,255,${alpha})`;
+      worldCtx.fillRect(sx, sy, 1, 1);
+    }
+  }
+
+  // Ground
+  const grad = worldCtx.createLinearGradient(0, groundY, 0, worldH);
+  const gc = {
+    forest:["#0d1f0a","#060d04"], tundra:["#0d1020","#050810"],
+    desert:["#1a100a","#0a0604"], wasteland:["#0f1008","#060704"],
+    moon:["#0a0a14","#040408"], nuclear:["#0f1404","#060804"]
+  }[world.biome] || ["#0d1a0a","#060904"];
+  grad.addColorStop(0, gc[0]);
+  grad.addColorStop(1, gc[1]);
+  worldCtx.fillStyle = grad;
+  worldCtx.fillRect(0, groundY, worldW, worldH - groundY);
+
+  // Ground line detail
+  worldCtx.fillStyle = world.isNight ? "#1a1a2a" : "#222233";
+  worldCtx.fillRect(0, groundY, worldW, 1);
+
+  // Fires
+  world.fires.forEach(f => drawFire(f));
+
+  // Statues
+  world.statues.forEach(s => {
+    worldCtx.font = "24px serif";
+    worldCtx.fillText("🗿", s.x - 12, s.y - 10);
+  });
+
+  // Buildings
+  world.buildings.forEach(b => {
+    worldCtx.fillStyle = "#1a1a30";
+    worldCtx.strokeStyle = "#2a2a50";
+    worldCtx.lineWidth = 1;
+    worldCtx.strokeRect(b.x-12, b.y-20, 24, 20);
+    worldCtx.fillRect(b.x-12, b.y-20, 24, 20);
+  });
+
+  // Eggs
+  world.eggs.forEach(eg => drawEgg(eg));
+
+  // Creatures
+  world.population.forEach(pet => {
+    if (pet.stage === "egg") return;
+    const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = 144;
+    offscreenCanvas.height = 144;
+    const octx = offscreenCanvas.getContext('2d');
+    const sc2 = pet.stage === "baby" ? 0.42 : pet.stage === "teen" ? 0.68 : pet.stage === "elder" ? 0.88 : 1.0;
+    drawCreature(octx, pet.genome, pet.stage, _frame, pet.action, false);
+    // Blit to world
+    const size = 144;
+    worldCtx.drawImage(offscreenCanvas, Math.round(pet.x - size/2), Math.round(pet.y - size + 8));
+
+    // Hat
+    if (pet.hat) {
+      worldCtx.font = "14px serif";
+      worldCtx.fillText(
+        pet.hat === "crown" ? "👑" : pet.hat === "party_hat" ? "🎉" : "🎩",
+        pet.x - 8, pet.y - size + 2
+      );
+    }
+
+    // Holy glow
+    if (pet.isHoly) {
+      worldCtx.save();
+      worldCtx.globalAlpha = 0.15 + Math.sin(Date.now()/600)*0.08;
+      worldCtx.fillStyle = "#ffb700";
+      worldCtx.beginPath();
+      worldCtx.arc(pet.x, pet.y - 60, 35, 0, Math.PI*2);
+      worldCtx.fill();
+      worldCtx.restore();
+    }
+
+    // Selected highlight
+    if (selectedPet?.id === pet.id) {
+      worldCtx.strokeStyle = "rgba(57,255,20,0.5)";
+      worldCtx.lineWidth = 1;
+      worldCtx.setLineDash([3,3]);
+      worldCtx.strokeRect(pet.x - 20, pet.y - size + 4, 40, size-8);
+      worldCtx.setLineDash([]);
+    }
+
+    // Name label
+    worldCtx.fillStyle = pet.isHoly ? "rgba(255,183,0,0.7)" :
+                         selectedPet?.id === pet.id ? "rgba(57,255,20,0.8)" : "rgba(80,80,120,0.7)";
+    worldCtx.font = "7px 'Space Mono', monospace";
+    worldCtx.textAlign = "center";
+    worldCtx.fillText(pet.genome.name.toUpperCase(), pet.x, pet.y - size + 0);
+    worldCtx.textAlign = "left";
+
+    // Hunger/need indicator
+    if (pet.hunger > 70) {
+      worldCtx.fillStyle = "rgba(255,80,80,0.8)";
+      worldCtx.font = "10px serif";
+      worldCtx.fillText("😰", pet.x - 5, pet.y - size - 4);
+    }
+    if (pet.tired > 85) {
+      worldCtx.fillStyle = "rgba(100,100,200,0.8)";
+      worldCtx.font = "10px serif";
+      worldCtx.fillText("💤", pet.x - 5, pet.y - size - 4);
+    }
+  });
+}
+
+function drawEgg(eg) {
+  const x = eg.x;
+  const y = eg.y;
+  const w = 14, h = 18;
+  const wobble = eg.wobble || 0;
+  worldCtx.save();
+  worldCtx.translate(x, y - h/2);
+  worldCtx.rotate(wobble * Math.PI/180);
+  worldCtx.translate(-x, -(y - h/2));
+
+  // Egg shape
+  const [c1, c2] = eg.design.colors;
+  const eg_grad = worldCtx.createRadialGradient(x-3, y-h+2, 1, x, y-h/2, h);
+  eg_grad.addColorStop(0, c1);
+  eg_grad.addColorStop(1, c2);
+  worldCtx.fillStyle = eg_grad;
+  worldCtx.beginPath();
+  worldCtx.ellipse(x, y-h/2, w/2, h/2, 0, 0, Math.PI*2);
+  worldCtx.fill();
+
+  // Pattern dots
+  if (eg.design.pattern === "spots" || eg.design.pattern === "speckle") {
+    worldCtx.fillStyle = "rgba(0,0,0,0.25)";
+    for (let i=0;i<5;i++) {
+      const dx = (Math.sin(i*2.3)*w*0.3);
+      const dy = (Math.cos(i*1.7)*h*0.25);
+      worldCtx.beginPath();
+      worldCtx.arc(x+dx, y-h/2+dy, 1.5, 0, Math.PI*2);
+      worldCtx.fill();
+    }
+  }
+
+  // Wobble near hatch
+  if (eg.tick > eg.tick * 0.8) {
+    worldCtx.strokeStyle = "rgba(255,183,0,0.4)";
+    worldCtx.lineWidth = 1;
+    worldCtx.beginPath();
+    worldCtx.ellipse(x, y-h/2, w/2+2, h/2+2, 0, 0, Math.PI*2);
+    worldCtx.stroke();
+  }
+  worldCtx.restore();
+
+  // Progress indicator
+  const pct = eg.tick / EGG_HATCH_TICKS;
+  worldCtx.fillStyle = "rgba(57,255,20,0.3)";
+  worldCtx.fillRect(x - 8, y + 2, Math.round(16 * pct), 2);
+  worldCtx.strokeStyle = "rgba(57,255,20,0.15)";
+  worldCtx.lineWidth = 1;
+  worldCtx.strokeRect(x - 8, y + 2, 16, 2);
+}
+
+function drawFire(f) {
+  const x = f.x, y = f.y;
+  const flicker = Math.sin(Date.now()/150 + x)*3;
+  worldCtx.fillStyle = `rgba(255,${100+Math.round(flicker*20)},0,0.8)`;
+  worldCtx.beginPath();
+  worldCtx.ellipse(x, y - 6 + flicker, 6, 10, 0, 0, Math.PI*2);
+  worldCtx.fill();
+  worldCtx.fillStyle = "rgba(255,220,0,0.6)";
+  worldCtx.beginPath();
+  worldCtx.ellipse(x, y - 4, 3, 6, 0, 0, Math.PI*2);
+  worldCtx.fill();
+  // Light glow
+  const grd = worldCtx.createRadialGradient(x, y-6, 0, x, y-6, 30);
+  grd.addColorStop(0, "rgba(255,140,0,0.08)");
+  grd.addColorStop(1, "rgba(255,140,0,0)");
+  worldCtx.fillStyle = grd;
+  worldCtx.beginPath();
+  worldCtx.arc(x, y-6, 30, 0, Math.PI*2);
+  worldCtx.fill();
+}
+
+// Click to select creature
+worldCanvas.addEventListener('click', e => {
+  if (world.paused && !pendingHatch) return;
+  const rect = worldCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  // Check if clicking on creature
+  const hit = world.population.find(p => {
+    const size = 144;
+    return Math.abs(p.x - mx) < 24 && Math.abs((p.y - size/2) - my) < 40;
+  });
+
+  if (hit) {
+    if (selectedItem) {
+      useItemOnPet(selectedItem, hit);
+      selectedItem = null;
+      renderItemBar();
+    } else {
+      selectedPet = hit;
+      renderSelectedPanel();
+    }
+  } else {
+    // Place egg if mystery_egg selected
+    if (selectedItem === "mystery_egg" && world.inventory.mystery_egg > 0) {
+      spawnEgg(null, true);
+      world.inventory.mystery_egg--;
+      selectedItem = null;
+      renderItemBar();
+      flashObs("🥚 Egg placed — hatches in 1 hour");
+    }
+    selectedPet = null;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// UI RENDERING
+// ═══════════════════════════════════════════════════════════════════
+function renderTopbar() {
+  document.getElementById('stat-pop').textContent = world.population.filter(p=>p.stage!=="egg").length;
+  document.getElementById('stat-eggs').textContent = world.eggs.length + world.inventory.mystery_egg;
+  document.getElementById('stat-gen').textContent = world.generation;
+  document.getElementById('stat-morale').textContent = world.morale;
+  document.getElementById('stat-food').textContent = Math.round(world.resources.food);
+  document.getElementById('stat-honey').textContent = Math.round(world.resources.honey);
+  document.getElementById('topbar-time').textContent =
+    `Day ${world.day} · ${world.season.charAt(0).toUpperCase()+world.season.slice(1)} · ${world.isNight?"Night":"Day"}`;
+}
+
+function renderPetList() {
+  const list = document.getElementById('pet-list');
+  list.innerHTML = '';
+  world.population.forEach(pet => {
+    const card = document.createElement('div');
+    card.className = 'pet-card' + (selectedPet?.id === pet.id ? ' selected' : '');
+    const stageColor = STAGE_COLORS[pet.stage] || "#888";
+    const actionEmoji = {
+      idle:"😶",wander:"🚶",forage:"🌿",sleep:"💤",socialize:"🤝",
+      fish:"🎣",hunt:"🏹",build:"🏗️",explore:"🔭",worship:"🙏",steal:"👀",sing:"🎵",flee:"💨"
+    }[pet.action] || "😶";
+    card.innerHTML = `
+      <div class="stage-dot" style="background:${stageColor}"></div>
+      <div class="pet-card-info">
+        <div class="pet-card-name ${pet.isHoly?'holy-glow':''}">${pet.genome.name}</div>
+        <div class="pet-card-meta">${pet.stage} · ${pet.archetypes[0]||'ordinary'}</div>
+      </div>
+      <div class="pet-card-mood">${actionEmoji}</div>
+    `;
+    card.onclick = () => { selectedPet = pet; renderSelectedPanel(); renderPetList(); };
+    list.appendChild(card);
+  });
+  if (world.population.length === 0) {
+    list.innerHTML = '<div style="padding:16px 12px;color:var(--dim);font-size:10px;">No petricules yet.<br><br>Hatch a mystery egg<br>to begin.</div>';
+  }
+}
+
+function renderSelectedPanel() {
+  const panel = document.getElementById('selected-panel');
+  if (!selectedPet) {
+    panel.innerHTML = '<div style="padding:20px 14px;color:var(--dim);font-size:10px;text-align:center;line-height:1.8;">Click a creature<br>to inspect it.</div>';
+    return;
+  }
+  const p = selectedPet;
+  const g = p.genome;
+  const stageColor = STAGE_COLORS[p.stage] || "#888";
+
+  const needBar = (val, color) =>
+    `<div class="need-bar"><div class="need-fill" style="width:${val}%;background:${color}"></div></div>`;
+  const gBar = (val, color="#39ff14") =>
+    `<div class="genome-bar"><div class="genome-bar-fill" style="width:${val}%;background:${color}"></div></div>`;
+  const barColor = v => v>=70?"#ff3355":v>=40?"#ffb700":"#39ff14";
+
+  panel.innerHTML = `
+    <div class="info-block">
+      <div style="color:${stageColor};font-size:11px;font-weight:700;margin-bottom:2px;">${g.name}</div>
+      <div style="color:var(--dim);font-size:9px;margin-bottom:6px;">${p.stage.toUpperCase()} · ${p.archetypes.join(", ")}</div>
+      ${p.isHoly ? '<div style="color:var(--amber);font-size:9px;margin-bottom:6px;">✨ HOLY ONE</div>' : ''}
+      <div class="stat-row"><span class="stat-label">Hunger</span>${needBar(p.hunger,"#ff3355")}</div>
+      <div class="stat-row"><span class="stat-label">Tired</span>${needBar(p.tired,"#5577ff")}</div>
+      <div class="stat-row"><span class="stat-label">Cold</span>${needBar(p.cold,"#44aaff")}</div>
+      <div style="margin-top:6px;color:var(--dim);font-size:9px;">Action: <span style="color:var(--cyan)">${p.action}</span></div>
+    </div>
+    <div class="info-block">
+      <div class="info-title">Behavioral Genome</div>
+      ${["aggression","intelligence","sociability","curiosity","empathy","greed","fear","creativity","piety","ambition","loyalty"].map(k=>`
+        <div class="stat-row" style="margin-bottom:4px;">
+          <span class="stat-label" style="min-width:70px">${k.slice(0,6).toUpperCase()}</span>
+          ${gBar(g[k]||0, barColor(g[k]||0))}
+          <span style="color:${barColor(g[k]||0)};font-size:9px;min-width:24px;text-align:right">${g[k]||0}</span>
+        </div>
+      `).join('')}
+      <div style="margin-top:6px">
+        <div style="color:var(--dim);font-size:8px;letter-spacing:1px;margin-bottom:3px;">VOICE</div>
+        <div style="color:var(--cyan);font-size:9px">${g.voiceType||"organic"} · ${g.biomePref||"forest"}</div>
+      </div>
+    </div>
+    <div class="info-block">
+      <div class="info-title">Creature Code</div>
+      <div class="creature-code">${g.creatureCode||"..."}</div>
+      <div style="color:var(--dim);font-size:8px;margin-top:4px">~2×10³³ possible</div>
+    </div>
+  `;
+}
+
+function renderItemBar() {
+  const bar = document.getElementById('item-bar');
+  bar.innerHTML = '';
+  ITEMS.forEach(item => {
+    const count = world.inventory[item.id] || 0;
+    const slot = document.createElement('div');
+    slot.className = 'item-slot' + (item.locked ? ' locked' : '') + (selectedItem === item.id ? ' selected' : '');
+    slot.innerHTML = `
+      <div class="item-emoji">${item.emoji}</div>
+      <div class="item-name">${item.name.split(' ')[0]}</div>
+      ${item.stackable ? `<div class="item-count ${count===0?'zero':''}">${count}</div>` : ''}
+    `;
+    if (!item.locked) {
+      slot.onclick = () => {
+        selectedItem = selectedItem === item.id ? null : item.id;
+        renderItemBar();
+        document.getElementById('sel-item-name').textContent = selectedItem ? item.name : "No item selected";
+        document.getElementById('sel-item-desc').textContent = selectedItem ? item.desc : "Click an item, then click a creature to use it.";
+        document.getElementById('sel-item-hint').textContent = selectedItem ? item.hint : "";
+      };
+    }
+    bar.appendChild(slot);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// OBSERVATION TRIGGERS (checked each tick)
+// ═══════════════════════════════════════════════════════════════════
+function checkObservations() {
+  const pop = world.population;
+  if (pop.length === 0) return;
+
+  // First fire — after 3+ adults exist for 30 ticks
+  const adults = pop.filter(p => p.stage === "adult");
+  if (adults.length >= 3 && world.tick % 90 === 0) {
+    if (!world.observations.has("first_fire") && Math.random() < 0.3) {
+      fireObs("first_fire", {journalWorthy:true});
+      world.fires.push({x: 150 + Math.random()*300, y: groundY});
+    }
+  }
+
+  // Warlord potential
+  if (!world.observations.has("warlord")) {
+    const warlord = pop.find(p => p.genome.aggression >= 78 && p.genome.ambition >= 75 && p.stage === "adult");
+    if (warlord) {
+      fireObs("warlord", {petId:warlord.id, journalWorthy:true});
+    }
+  }
+
+  // Starvation warning
+  if (world.resources.food < 10 && world.tick % 200 === 0) {
+    queueVoss("starvation");
+  }
+
+  // Group chorus — 3+ high-creativity adults near each other
+  if (world.tick % 300 === 0) {
+    const singers = pop.filter(p => p.genome.creativity > 65 && p.stage !== "baby");
+    if (singers.length >= 3) {
+      fireObs("group_chorus", {journalWorthy:true});
+    }
+  }
+
+  // Near water — random
+  if (world.tick % 500 === 0 && !world.observations.has("near_water")) {
+    const curious = pop.find(p => p.genome.curiosity > 55);
+    if (curious) fireObs("near_water", {petId:curious.id});
+  }
+
+  // Elder treatment
+  const elders = pop.filter(p => p.stage === "elder");
+  if (elders.length > 0 && world.tick % 600 === 0) {
+    const elder = elders[0];
+    const avgEmpathy = pop.reduce((s,p)=>s+(p.genome.empathy||0),0)/pop.length;
+    if (avgEmpathy < 30 && Math.random() < 0.2) {
+      fireObs("elder_exile", {petId:elder.id, journalWorthy:true});
+    }
+  }
+
+  // Resource regen
+  world.resources.food = Math.min(500, world.resources.food + 0.1 * adults.length);
+  if (world.tick % 1000 === 0 && Math.random() < 0.05) {
+    world.resources.honey = Math.min(50, world.resources.honey + 1);
+    if (world.resources.honey === 1) {
+      fireObs("first_honey", {journalWorthy:true});
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DEATH & CLEANUP
+// ═══════════════════════════════════════════════════════════════════
+function processDeath(pet, cause) {
+  world.graves.push({name:pet.genome.name, cause, day:world.day, gen:world.generation, x:pet.x});
+  if (cause === "starvation") {
+    queueVoss("starvation");
+    world.generationEvents.push("starvation");
+  }
+  if (cause === "cold") {
+    queueVoss("cold_death");
+  }
+  if (world.population.length === 1) {
+    // Last one
+    fireObs("last_one", {petId:pet.id, journalWorthy:true});
+    queueVoss("last_one");
+    // Voss sends egg
+    setTimeout(() => {
+      world.inventory.mystery_egg++;
+      renderItemBar();
+    }, 5000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN GAME LOOP
+// ═══════════════════════════════════════════════════════════════════
+let _ticks = 0;
+
+function gameLoop(ts) {
+  _animFrame = requestAnimationFrame(gameLoop);
+  _frame = Math.floor(ts / 200) % 8;
+
+  if (!world.paused) {
+    _tickAccum += (ts - (_lastTickTime||ts)) * world.speed;
+    _lastTickTime = ts;
+
+    while (_tickAccum >= TICK_MS) {
+      _tickAccum -= TICK_MS;
+      gameTick();
+    }
+  } else {
+    _lastTickTime = ts;
+  }
+
+  tickVoss(ts);
+  renderWorld();
+  if (_ticks % 6 === 0) {
+    renderTopbar();
+    renderPetList();
+    if (selectedPet) renderSelectedPanel();
+  }
+  _ticks++;
+}
+
+function gameTick() {
+  world.tick++;
+  const tickInDay = 180;
+  world.isNight = (world.tick % tickInDay) > tickInDay * 0.6;
+  if (world.tick % tickInDay === 0) {
+    world.day++;
+    const seasons = ["spring","summer","autumn","winter"];
+    world.season = seasons[Math.floor(world.day / 7) % 4];
+  }
+
+  // Tick all pets
+  for (let i = world.population.length - 1; i >= 0; i--) {
+    const pet = world.population[i];
+    const result = tickPet(pet);
+    if (result.died) {
+      processDeath(pet, result.cause);
+      world.population.splice(i, 1);
+    }
+  }
+
+  // Tick eggs
+  tickEggs();
+
+  // Voss egg delivery
+  tickVossEggs();
+
+  // Observations
+  if (world.tick % 10 === 0) checkObservations();
+
+  // Morale drift
+  const avgHunger = world.population.length > 0
+    ? world.population.reduce((s,p)=>s+p.hunger,0)/world.population.length : 50;
+  world.morale = Math.max(0, Math.min(100, world.morale - (avgHunger > 70 ? 0.5 : -0.1)));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+function togglePause() {
+  world.paused = !world.paused;
+  document.getElementById('pause-btn').textContent = world.paused ? "▶ PLAY" : "⏸ PAUSE";
+}
+
+function setSpeed(s) {
+  world.speed = s;
+  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+  const labels = {"0.5":"½×","1":"1×","3":"3×","8":"8×"};
+  document.querySelectorAll('.speed-btn').forEach(b => {
+    if (b.textContent === labels[String(s)]) b.classList.add('active');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('resize', () => { resizeWorld(); });
+
+function init() {
+  resizeWorld();
+  renderItemBar();
+  renderPetList();
+  renderTopbar();
+  renderSelectedPanel();
+
+  // Start with 1 egg already incubating (given by Voss at game open)
+  world.inventory.mystery_egg = 1;
+  world.inventory.cookie = 8;
+  renderItemBar();
+
+  // Opening Voss message (delayed)
+  setTimeout(() => queueVoss("voss_egg"), 2500);
+
+  // Start loop
+  requestAnimationFrame(gameLoop);
+}
+
+init();
+</script>
+</body>
+</html>
